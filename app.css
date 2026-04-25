@@ -1,0 +1,80 @@
+/* ============================================
+   APUNTES FACULTAD - Estilos de la aplicación
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+body, html {
+    font-family: 'Inter', sans-serif;
+    background-color: #f8fafc;
+    color: #1e293b;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    width: 100vw;
+    height: 100dvh;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Sidebar colapsada */
+.sidebar.collapsed .hide-on-collapse { display: none !important; }
+.sidebar.collapsed .center-on-collapse { justify-content: center; padding-left: 0; padding-right: 0; }
+
+.panel-transition { transition: all 0.3s ease; }
+
+/* Editor */
+#notes-editor {
+    outline: none;
+    line-height: 1.7;
+    font-size: 0.95rem;
+    color: #334155;
+}
+#notes-editor[data-placeholder]:empty:before {
+    content: attr(data-placeholder);
+    color: #94a3b8;
+    font-style: italic;
+    pointer-events: none;
+}
+#notes-editor img {
+    max-width: 100%;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    margin: 1rem auto;
+    display: block;
+}
+
+/* Chat IA */
+.msg-user { background-color: #4f46e5; color: white; border-bottom-right-radius: 2px; }
+.msg-ai { background-color: #f1f5f9; color: #1e293b; border-bottom-left-radius: 2px; border: 1px solid #e2e8f0; }
+
+/* Utilidades */
+.glass-panel { background: rgba(255, 255, 255, 0.9); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.modal-overlay { background: rgba(15, 23, 42, 0.6); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
+
+/* Filtro de lectura */
+.reading-filter-active {
+    background-color: #fef3c7 !important;
+    filter: sepia(0.3) brightness(1.05) contrast(0.95);
+}
+.reading-filter-active #pdf-canvas {
+    filter: sepia(0.4) brightness(1.1) contrast(0.9);
+}
+.reading-filter-active .bg-slate-100 { background-color: #fef3c7 !important; }
+.reading-filter-active body { background-color: #fef3c7 !important; }
+.reading-filter-active .bg-white { background-color: #fef9e3 !important; }
+.reading-filter-active #notes-editor { color: #44403c !important; }
+
+/* Imágenes en editor */
+#notes-editor img:hover { box-shadow: 0 0 0 3px #c7d2fe; }
+#notes-editor img.selected { box-shadow: 0 0 0 3px #6366f1; }
+
+/* Responsive */
+@media (max-width: 768px) {
+    .sidebar { position: fixed; left: 0; top: 0; height: 100%; z-index: 50; transform: translateX(-100%); }
+    .sidebar.mobile-open { transform: translateX(0); }
+}
