@@ -1,4 +1,4 @@
-# 📖 Sistema de Resumen Ejecutivo - Documentación Completa
+# 📖 Sistema de Resumen Ejecutivo
 
 ## 🎯 Objetivo
 
@@ -8,12 +8,6 @@ Crear materiales de estudio completos y claros que te permitan **repasar temas s
 
 ## 🔄 Cómo Funciona (Nuevo Flujo)
 
-### ANTES (sistema viejo):
-```
-Tus apuntes → Extraer palabras clave → Buscar fragmentos sueltos → Resultado desordenado
-```
-
-### AHORA (sistema nuevo):
 ```
 Tus apuntes 
   ↓
@@ -206,55 +200,6 @@ maxTokens: 4500  // De 3500 a 4500
 **Más contenido por concepto:**
 ```javascript
 minRelevanceScore: 0.1  // De 0.15 a 0.1 (más permisivo)
-```
-
----
-
-## 📊 Logs de Debug
-
-Abrí la consola del navegador (F12) para ver:
-
-```
-📝 Conceptos extraídos de tus apuntes: 7
-  → "Médula suprarrenal", "Parte interna de la glándula adrenal", "Células cromafines"...
-✅ Filtrado de calidad: 87 → 34 chunks válidos
-📊 7 conceptos con matches encontrados
-✅ Resumen ejecutivo generado: ~2847 tokens, 7 conceptos
-```
-
----
-
-## 🎯 Comparación: Antes vs Ahora
-
-### ANTES:
-```
-Tema: Médula suprarrenal
-
-Resultado:
-- GENERAL
-- ADH Hormona antidiurética
-- ACE Enzima convertidora
-- ACTH Hormona adrenocorticotrópica
-❌ Glosarios sin sentido
-```
-
-### AHORA:
-```
-Tema: Médula suprarrenal
-
-Resultado:
-💡 MÉDULA SUPRARRENAL
-   📄 Endocrinología Cap. 15 (pág. 234)
-   La médula suprarrenal es la porción interna 
-   de la glándula adrenal. Está formada por 
-   células cromafines...
-
-💡 CÉLULAS CROMAFINES
-   📄 Fisiología Médica (pág. 456)
-   Las células cromafines derivan de la cresta 
-   neural y constituyen un ganglio simpático...
-
-✅ Contenido real, explicado, útil para estudiar
 ```
 
 ---
