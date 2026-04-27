@@ -14,6 +14,9 @@
     <!-- PDF.js via CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+    
+    <!-- Google Identity Services OAuth 2.0 -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <!-- MANIFEST PWA -->
     <link rel="manifest" href="manifest.json" id="pwa-manifest">
@@ -347,7 +350,44 @@
     </div>
 
     <!-- Lógica de la aplicación -->
+    <!-- MODAL: Login Google Drive -->
+    <div id="login-modal" class="fixed inset-0 modal-overlay z-50 flex justify-center items-center bg-slate-900/90">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all p-8 text-center">
+            <div class="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <i class="fas fa-cloud text-white text-3xl"></i>
+            </div>
+            
+            <h2 class="text-xl font-bold text-slate-800 mb-2">Sincronizar con Google Drive</h2>
+            <p class="text-sm text-slate-500 mb-6">Inicia sesión con tu cuenta de Google para guardar y sincronizar todos tus apuntes en la nube automáticamente.</p>
+            
+            <div id="g_id_onload"
+                 data-client_id="TU_CLIENT_ID_AQUI"
+                 data-context="signin"
+                 data-ux_mode="popup"
+                 data-callback="handleGoogleLogin"
+                 data-auto_prompt="false"
+                 data_scope="https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file">
+            </div>
+            
+            <div class="g_id_signin"
+                 data-type="standard"
+                 data-shape="rectangular"
+                 data-theme="outline"
+                 data-text="signin_with"
+                 data-size="large"
+                 data-logo_alignment="left">
+            </div>
+            
+            <button onclick="closeModal('login-modal')" class="w-full mt-4 text-slate-400 hover:text-slate-600 text-sm">Usar solo localmente</button>
+            
+            <div class="mt-6 pt-6 border-t border-slate-100 text-xs text-slate-400">
+                ✅ Los datos se guardan de forma privada en tu Drive, nadie tiene acceso a ellos
+            </div>
+        </div>
+    </div>
+
     <script src="app.js"></script>
     <script src="local-summary.js"></script>
+    <script src="google-drive-sync.js"></script>
 </body>
 </html>
