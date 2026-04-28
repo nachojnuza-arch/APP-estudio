@@ -42,7 +42,11 @@ function initGoogleAuth() {
             
             saveGoogleSession();
             showToast("✅ Conectado correctamente con Google Drive", "success");
-            closeModal('login-modal');
+            
+            // Si el modal está abierto, cerrarlo
+            const loginModal = document.getElementById('login-modal');
+            if(loginModal) loginModal.classList.add('hidden');
+            
             updateUIForLoggedInUser();
             startAutoSync();
             loadFromDrive();
@@ -75,19 +79,6 @@ async function fetchGoogleUserInfo() {
     } catch(e) {
         console.warn("No se pudo obtener info de usuario", e);
     }
-}
-
-/**
- * Decodificar token JWT sin necesidad de librerías
- */
-function parseJwt(token) {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
-        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-    }).join(''));
-
-    return JSON.parse(jsonPayload);
 }
 
 /**
@@ -134,6 +125,7 @@ function loadGoogleSession() {
 function updateUIForLoggedInUser() {
     // Agregar indicador de sincronización en la barra superior
     const headerRight = document.querySelector('header .flex.items-center.gap-2');
+    if (!headerRight) return;
     
     // Eliminar botón anterior si existe
     const existingSyncBtn = document.getElementById('sync-status-btn');
@@ -143,57 +135,52 @@ function updateUIForLoggedInUser() {
     const syncButton = document.createElement('button');
     syncButton.id = 'sync-status-btn';
     syncButton.className = 'text-green-500 p-2 rounded-lg transition-colors flex items-center gap-1 text-xs font-medium';
-    syncButton.title = `Conectado como ${GoogleDriveSync.user.email}`;
+    syncButton.title = `Conectado como ${GoogleDriveSync.user?.email || 'Usuario'}`;
     syncButton.innerHTML = `<i class="fas fa-cloud"></i> <span class="hidden sm:inline">Sincronizado</span>`;
+    syncButton.onclick = () => saveToDrive(); // Permitir guardado manual al hacer clic
     
     // Insertar antes del resto de botones
     headerRight.insertBefore(syncButton, headerRight.firstChild);
 }
 
 /**
- * Guardar todos los datos de la aplicación en Google Drive
+ * Guardar todos los datos de texto de la aplicación en Google Drive
  */
 async function saveToDrive() {
     if (!GoogleDriveSync.isLoggedIn) return false;
     
     try {
-        document.getElementById('save-status').innerHTML = '<i class="fas fa-sync fa-spin text-indigo-500"></i> Sincronizando...';
+        const saveStatus = document.getElementById('save-status');
+        if (saveStatus) saveStatus.innerHTML = '<i class="fas fa-sync fa-spin text-indigo-500"></i> Sincronizando...';
         
-        // Obtener todos los datos locales actuales
-        const appData = {
-            subjects: JSON.parse(localStorage.getItem('subjects') || '[]'),
-            files: JSON.parse(localStorage.getItem('files') || '[]'),
-            notes: JSON.parse(localStorage.getItem('notes') || '{}'),
-            settings: JSON.parse(localStorage.getItem('settings') || '{}'),
-            syncTimestamp: new Date().toISOString()
-        };
+        // 🆕 CORRECCIÓN: Leer exactamente la estructura que usa app.js
+        let appData = JSON.parse(localStorage.getItem('studio_data_v2') || '{"subjects":[],"notes":{}}');
+        appData.syncTimestamp = new Date().toISOString();
         
-        // Primero buscar si ya existe el archivo de backup
         const existingFile = await findDriveFile('studio_app_backup.json');
         
         if (existingFile) {
-            // Actualizar archivo existente
             await updateDriveFile(existingFile.id, appData);
         } else {
-            // Crear nuevo archivo
             await createDriveFile('studio_app_backup.json', appData);
         }
         
         GoogleDriveSync.lastSyncTime = Date.now();
-        document.getElementById('save-status').innerHTML = '<i class="fas fa-check text-green-500"></i> Sincronizado con Drive';
+        if (saveStatus) saveStatus.innerHTML = '<i class="fas fa-check text-green-500"></i> Sincronizado con Drive';
         
-        console.log("✅ Datos guardados correctamente en Google Drive");
+        console.log("✅ Datos base guardados correctamente en Google Drive");
         return true;
         
     } catch (error) {
         console.error("❌ Error guardando en Drive:", error);
-        document.getElementById('save-status').innerHTML = '<i class="fas fa-exclamation-triangle text-orange-500"></i> Error sincronización';
+        const saveStatus = document.getElementById('save-status');
+        if (saveStatus) saveStatus.innerHTML = '<i class="fas fa-exclamation-triangle text-orange-500"></i> Error sincronización';
         return false;
     }
 }
 
 /**
- * Cargar datos desde Google Drive
+ * Cargar datos de texto desde Google Drive
  */
 async function loadFromDrive() {
     if (!GoogleDriveSync.isLoggedIn) return false;
@@ -207,14 +194,21 @@ async function loadFromDrive() {
             const data = await getDriveFileContent(backupFile.id);
             
             if (data && data.subjects) {
-                // Restaurar datos en localStorage
-                localStorage.setItem('subjects', JSON.stringify(data.subjects));
-                localStorage.setItem('files', JSON.stringify(data.files));
-                localStorage.setItem('notes', JSON.stringify(data.notes));
-                localStorage.setItem('settings', JSON.stringify(data.settings));
+                // 🆕 CORRECCIÓN: Guardar en la llave correcta de app.js
+                localStorage.setItem('studio_data_v2', JSON.stringify(data));
                 
-                // Recargar la interfaz
-                if (typeof loadSubjects === 'function') loadSubjects();
+                // Actualizar variables en memoria
+                if (typeof window.appData !== 'undefined') {
+                    window.appData = data;
+                }
+                
+                // Refrescar UI
+                if (typeof renderSubjects === 'function') {
+                    renderSubjects();
+                }
+                if (typeof renderAiSources === 'function') {
+                    renderAiSources();
+                }
                 
                 showToast("Datos restaurados correctamente desde Drive", "success");
                 return true;
@@ -230,28 +224,108 @@ async function loadFromDrive() {
     }
 }
 
+// ==============================================================
+// 🆕 NUEVAS FUNCIONES PARA MANEJAR PDFs PESADOS EN GOOGLE DRIVE
+// ==============================================================
+
 /**
- * Buscar archivo en Google Drive por nombre
+ * Sube un archivo (PDF) a la carpeta de datos de la app en Google Drive.
+ * Se hace en 2 pasos: primero se crea la metadata y luego se sube el contenido binario.
+ * @returns {string} El ID del archivo en Google Drive.
  */
-async function findDriveFile(fileName) {
-    const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${fileName}'&spaces=appDataFolder`, {
+async function uploadPdfToDrive(file, fileName) {
+    if (!GoogleDriveSync.isLoggedIn) throw new Error("No hay sesión en Google Drive");
+
+    showToast(`Subiendo ${fileName} a la nube... Esto puede tardar unos segundos.`, "info");
+
+    // Paso 1: Crear metadatos en Drive (archivo vacío)
+    const metadata = {
+        name: fileName,
+        mimeType: 'application/pdf',
+        parents: ['appDataFolder'] // Lo guardamos en la carpeta oculta de la app
+    };
+
+    const resMetadata = await fetch('https://www.googleapis.com/drive/v3/files', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${GoogleDriveSync.accessToken}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(metadata)
+    });
+
+    if (!resMetadata.ok) throw new Error("Error creando archivo en Drive");
+    const fileInfo = await resMetadata.json();
+    const driveFileId = fileInfo.id;
+
+    // Paso 2: Subir el contenido binario (Blob/File) usando el ID generado
+    const resUpload = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`, {
+        method: 'PATCH',
+        headers: {
+            'Authorization': `Bearer ${GoogleDriveSync.accessToken}`,
+            'Content-Type': 'application/pdf'
+        },
+        body: file
+    });
+
+    if (!resUpload.ok) throw new Error("Error subiendo el contenido del PDF");
+    
+    console.log(`✅ PDF ${fileName} subido a Drive con ID: ${driveFileId}`);
+    return driveFileId;
+}
+
+/**
+ * Descarga el contenido binario de un PDF desde Google Drive
+ * @returns {Blob} El archivo PDF listo para usarse
+ */
+async function downloadPdfFromDrive(driveFileId) {
+    if (!GoogleDriveSync.isLoggedIn) throw new Error("No hay sesión en Google Drive");
+
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`, {
         headers: {
             'Authorization': `Bearer ${GoogleDriveSync.accessToken}`
         }
     });
-    
-    const result = await response.json();
-    
-    if (result.files && result.files.length > 0) {
-        return result.files[0];
+
+    if (!response.ok) {
+        throw new Error("No se pudo descargar el PDF de la nube");
     }
-    
-    return null;
+
+    return await response.blob();
 }
 
 /**
- * Crear nuevo archivo en Google Drive (carpeta oculta appData)
+ * Elimina un archivo permanentemente de la carpeta de la app en Drive
  */
+async function deletePdfFromDrive(driveFileId) {
+    if (!GoogleDriveSync.isLoggedIn) return; // Si no hay sesión, no podemos borrarlo
+
+    try {
+        await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${GoogleDriveSync.accessToken}`
+            }
+        });
+        console.log(`🗑️ PDF eliminado de Drive: ${driveFileId}`);
+    } catch (e) {
+        console.warn("Error borrando el archivo de Drive, tal vez ya no existía.", e);
+    }
+}
+
+// ==============================================================
+// FUNCIONES AUXILIARES DRIVE API (JSON y REST)
+// ==============================================================
+
+async function findDriveFile(fileName) {
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${fileName}'&spaces=appDataFolder`, {
+        headers: { 'Authorization': `Bearer ${GoogleDriveSync.accessToken}` }
+    });
+    const result = await response.json();
+    if (result.files && result.files.length > 0) return result.files[0];
+    return null;
+}
+
 async function createDriveFile(fileName, content) {
     const boundary = '-------314159265358979323846';
     const delimiter = "\r\n--" + boundary + "\r\n";
@@ -284,9 +358,6 @@ async function createDriveFile(fileName, content) {
     return await response.json();
 }
 
-/**
- * Actualizar archivo existente en Drive
- */
 async function updateDriveFile(fileId, content) {
     const response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}`, {
         method: 'PATCH',
@@ -296,82 +367,52 @@ async function updateDriveFile(fileId, content) {
         },
         body: JSON.stringify(content)
     });
-    
     return await response.json();
 }
 
-/**
- * Obtener contenido de un archivo desde Drive
- */
 async function getDriveFileContent(fileId) {
     const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-        headers: {
-            'Authorization': `Bearer ${GoogleDriveSync.accessToken}`
-        }
+        headers: { 'Authorization': `Bearer ${GoogleDriveSync.accessToken}` }
     });
-    
     return await response.json();
 }
 
-/**
- * Iniciar sincronización automática cada 60 segundos
- */
 function startAutoSync() {
     if (GoogleDriveSync.syncInterval) clearInterval(GoogleDriveSync.syncInterval);
-    
     GoogleDriveSync.syncInterval = setInterval(() => {
         saveToDrive();
     }, 60000); // 1 minuto
 }
 
-/**
- * Cerrar sesión de Google
- */
 function logoutGoogle() {
     GoogleDriveSync.isLoggedIn = false;
     GoogleDriveSync.user = null;
     GoogleDriveSync.accessToken = null;
-    
     localStorage.removeItem('google_session');
-    
     if (GoogleDriveSync.syncInterval) {
         clearInterval(GoogleDriveSync.syncInterval);
         GoogleDriveSync.syncInterval = null;
     }
-    
     const syncBtn = document.getElementById('sync-status-btn');
     if (syncBtn) syncBtn.remove();
-    
     showToast("Sesión de Google cerrada", "info");
 }
 
-/**
- * Inicializar módulo al cargar la página
- */
 document.addEventListener('DOMContentLoaded', () => {
-    // Intentar restaurar sesión existente
     const sessionRestored = loadGoogleSession();
-    
-    // Si no hay sesión activa, mostrar modal de login después de 2 segundos
     if (!sessionRestored) {
         setTimeout(() => {
-            // Solo mostrar si el usuario no lo cerró anteriormente
-            if (!localStorage.getItem('login_modal_closed')) {
-                document.getElementById('login-modal').classList.remove('hidden');
+            const loginModal = document.getElementById('login-modal');
+            if (loginModal && !localStorage.getItem('login_modal_closed')) {
+                loginModal.classList.remove('hidden');
             }
         }, 2000);
     }
 });
 
-// Agregar opción para guardar manualmente
 document.addEventListener('keydown', (e) => {
-    // Ctrl + S para sincronizar manualmente
     if (e.ctrlKey && e.key === 's') {
         e.preventDefault();
-        if (GoogleDriveSync.isLoggedIn) {
-            saveToDrive();
-        }
+        if (GoogleDriveSync.isLoggedIn) saveToDrive();
     }
 });
-
-console.log("✅ Módulo Google Drive Sync cargado correctamente");
