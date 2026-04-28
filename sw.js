@@ -1,27 +1,33 @@
-const CACHE_NAME = 'apuntes-facultad-cache-v1';
+const CACHE_NAME = 'apuntes-facultad-cache-v2';
+
+// 1. Lista corregida: usamos los nombres reales de tus archivos
 const FILES_TO_CACHE = [
   './',
   './index.html',
-  './styles.css',
-  './scripts.js',
-  './manifest.json',
-  './pdfjs-5.5.207-dist/build/pdf.mjs',
-  './pdfjs-5.5.207-dist/build/pdf.worker.mjs'
+  './app.css',
+  './app.js',
+  './local-summary.js',
+  './google-drive-sync.js',
+  './ai-original.js',
+  './manifest.json'
 ];
 
-// Instala el service worker y guarda en caché todos los archivos principales de la aplicación.
+// Instala el service worker y guarda en caché
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('[ServiceWorker] Guardando archivos en caché para uso offline');
-        return cache.addAll(FILES_TO_CACHE);
+        // Usamos catch para que si falta un archivo (ej: app.css), el ServiceWorker no se muera
+        return cache.addAll(FILES_TO_CACHE).catch(err => {
+            console.warn('[ServiceWorker] Advertencia: Algún archivo no se pudo cachear.', err);
+        });
       })
   );
   self.skipWaiting();
 });
 
-// Activa el service worker y elimina cachés antiguos.
+// Activa el service worker y elimina cachés antiguos
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keyList => {
@@ -36,19 +42,28 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-// Intercepta las peticiones y sirve los archivos desde la caché.
-// Si un archivo no está en la caché, intenta buscarlo en la red.
+// Intercepta las peticiones (Fetch)
 self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET') {
-    return;
+  
+  // 🛑 REGLA DE ORO PARA GOOGLE DRIVE Y GEMINI
+  // Si la petición va dirigida a Google, Drive o no es tipo GET (ej: POST para subir archivo),
+  // el ServiceWorker la ignora y la deja pasar directo a internet.
+  if (
+      event.request.url.includes('googleapis.com') || 
+      event.request.url.includes('googleusercontent.com') ||
+      event.request.url.includes('googledrive.com') ||
+      event.request.method !== 'GET'
+  ) {
+      return; 
   }
 
+  // Para el resto (archivos de tu página), intenta usar el caché o ir a la red
   event.respondWith(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.match(event.request)
-        .then(response => {
-          return response || fetch(event.request);
+    caches.match(event.request)
+      .then(response => {
+        return response || fetch(event.request).catch(() => {
+            console.log('[ServiceWorker] Sin conexión para:', event.request.url);
         });
-    })
+      })
   );
 });
