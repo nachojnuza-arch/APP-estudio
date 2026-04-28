@@ -18,19 +18,22 @@ const GOOGLE_CLIENT_ID = "155926821940-m8mfuskn410j57sinnqi3dk2saremkdm.apps.goo
 
 let tokenClient = null;
 
-/**
+
+ /**
  * ✅ METODO CORRECTO OFICIAL PARA LOGIN Y ACCESO A DRIVE API
  */
 function initGoogleAuth() {
     tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: GOOGLE_CLIENT_ID,
-        scope: "https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file",
+        // 👇 AQUÍ ESTÁ EL CAMBIO: agregamos 'profile email' al final
+        scope: "https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file profile email",
         callback: (tokenResponse) => {
             if (tokenResponse.error) {
                 console.error("❌ Error login", tokenResponse);
                 showToast("Error al iniciar sesión con Google", "error");
                 return;
             }
+// ... resto del código igual ...
 
             // ✅ AQUI SI TENEMOS UN ACCESS_TOKEN VALIDO PARA DRIVE API
             GoogleDriveSync.isLoggedIn = true;
