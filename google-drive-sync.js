@@ -13,38 +13,67 @@ window.GoogleDriveSync = {
     lastSyncTime: null
 };
 
+// 🔑 CONFIGURA TU CLIENT ID AQUI
+const GOOGLE_CLIENT_ID = "155926821940-m8mfuskn410j57sinnqi3dk2saremkdm.apps.googleusercontent.com";
+
+let tokenClient = null;
+
 /**
- * Callback que se ejecuta cuando el usuario se loguea correctamente con Google
+ * ✅ METODO CORRECTO OFICIAL PARA LOGIN Y ACCESO A DRIVE API
  */
-function handleGoogleLogin(response) {
-    console.log("✅ Login con Google exitoso", response);
-    
-    if (response.credential) {
-        // Decodificar token JWT para obtener datos del usuario
-        const userData = parseJwt(response.credential);
-        
-        GoogleDriveSync.isLoggedIn = true;
-        GoogleDriveSync.user = userData;
-        GoogleDriveSync.accessToken = response.credential;
-        GoogleDriveSync.tokenExpiry = Date.now() + (3600 * 1000); // 1 hora validez
-        
-        // Guardar sesión en localStorage
+function initGoogleAuth() {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: "https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file",
+        callback: (tokenResponse) => {
+            if (tokenResponse.error) {
+                console.error("❌ Error login", tokenResponse);
+                showToast("Error al iniciar sesión con Google", "error");
+                return;
+            }
+
+            // ✅ AQUI SI TENEMOS UN ACCESS_TOKEN VALIDO PARA DRIVE API
+            GoogleDriveSync.isLoggedIn = true;
+            GoogleDriveSync.accessToken = tokenResponse.access_token;
+            GoogleDriveSync.tokenExpiry = Date.now() + (tokenResponse.expires_in * 1000);
+            
+            // Obtener datos del usuario
+            fetchGoogleUserInfo();
+            
+            saveGoogleSession();
+            showToast("✅ Conectado correctamente con Google Drive", "success");
+            closeModal('login-modal');
+            updateUIForLoggedInUser();
+            startAutoSync();
+            loadFromDrive();
+        },
+        error_callback: (err) => {
+            console.error("❌ OAuth Error", err);
+            showToast("Error de autorización Google", "error");
+        }
+    });
+}
+
+/**
+ * Iniciar flujo de login cuando el usuario clickea el boton
+ */
+function loginWithGoogle() {
+    if (!tokenClient) initGoogleAuth();
+    tokenClient.requestAccessToken({ prompt: "consent" });
+}
+
+/**
+ * Obtener datos del perfil del usuario logueado
+ */
+async function fetchGoogleUserInfo() {
+    try {
+        const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+            headers: { Authorization: `Bearer ${GoogleDriveSync.accessToken}` }
+        });
+        GoogleDriveSync.user = await res.json();
         saveGoogleSession();
-        
-        // Mostrar notificación exitosa
-        showToast("Sesión iniciada correctamente con Google Drive", "success");
-        
-        // Cerrar modal de login
-        closeModal('login-modal');
-        
-        // Actualizar interfaz con datos del usuario
-        updateUIForLoggedInUser();
-        
-        // Iniciar sincronización automática
-        startAutoSync();
-        
-        // Cargar datos existentes desde Drive
-        loadFromDrive();
+    } catch(e) {
+        console.warn("No se pudo obtener info de usuario", e);
     }
 }
 
