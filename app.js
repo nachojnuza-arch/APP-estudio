@@ -16,8 +16,9 @@ if ('serviceWorker' in navigator) {
 }
 
 // ==========================================
-// 0. BASE DE DATOS INTERNA (IndexedDB)
+// 0. BASE DE DATOS INTERNA (IndexedDB) - Para que los PDFs no expiren!
 // ==========================================
+// Estado para capturas de pantalla
 let screenshotState = {
     isCapturing: false,
     startX: 0,
@@ -76,7 +77,7 @@ let currentState = {
     currentFileId: null,
     currentSubject: null,
     expandedSubjects: {},
-    expandedAiSubjects: {},
+    expandedAiSubjects: {},  // ✅ Inicializado para fuentes IA
     pdfDoc: null,
     pageNum: 1,
     zoom: 1.2,
@@ -84,6 +85,8 @@ let currentState = {
 };
 
 let autoSaveTimer = null;
+
+// 🆕 CACHE DE RESPUESTAS DE IA (ahorra tokens y tiempo)
 
 function loadData() {
     const saved = localStorage.getItem('studio_data_v2'); 
@@ -116,10 +119,6 @@ function clearAllData() {
         showEmptyState('¡Datos borrados!', 'Añade una materia nueva para comenzar.');
         document.getElementById('notes-editor').innerHTML = '';
         showToast('Todos los datos han sido borrados', 'success');
-        
-        if (window.GoogleDriveSync && window.GoogleDriveSync.isLoggedIn) {
-            if (typeof saveToDrive === 'function') saveToDrive();
-        }
     }
 }
 
@@ -133,6 +132,7 @@ function toggleSidebar() {
     sidebar.classList.toggle('collapsed');
 }
 
+// Filtro de lectura - Modo sepia para reducir fatiga visual
 let readingFilterActive = false;
 function toggleReadingFilter() {
     readingFilterActive = !readingFilterActive;
@@ -154,6 +154,7 @@ function toggleReadingFilter() {
 
 function toggleNotesPanel() {
     const panel = document.getElementById('notes-panel');
+    // Usar classList toggle es mucho más seguro para diseños responsive
     if (panel.classList.contains('hidden')) {
         panel.classList.remove('hidden');
         panel.classList.add('flex');
@@ -180,10 +181,147 @@ function openModal(id) {
 }
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
+// ==========================================
+// 2bis. UTILIDADES NLP PARA FILTRADO GUIADO
+// ==========================================
+
+// Tokenizar texto para análisis
+// ==========================================
+// CLASIFICACIÓN DE TEMAS POR PALABRAS CLAVE (sin IA)
+// ==========================================
+
+/**
+ * Diccionario de temas médicos con sus palabras clave.
+ * Cada tema tiene: displayName, keywords (para match), parent (opcional, para subtemas)
+ */
+const MEDICAL_TOPIC_MAP = [
+    // ── Hiperaldosteronismo ──
+    {
+        id: 'hiperaldosteronismo',
+        displayName: 'Hiperaldosteronismo primario',
+        keywords: ['aldosterona', 'aldosteronismo', 'renina', 'apa', 'iha', 'pac', 'pra',
+            'cociente', 'aldosterona-renina', 'aldosteronemia', 'hiperaldosteronismo',
+            'adenoma', 'hiperplasia', 'adrenal', 'suprarrenal', 'espironolactona', 'eplerenona',
+            'fludrocortisona', 'supresión', 'salina', 'adrenalectomía', 'conn'],
+        parent: null
+    },
+    // ── Síndrome de Cushing ──
+    {
+        id: 'cushing',
+        displayName: 'Síndrome de Cushing',
+        keywords: ['cortisol', 'acth', 'cushing', 'dexametasona', 'clu', 'cortisolemia',
+            'hipercortisolismo', 'dexa', 'dexametasona', 'corticotropina', 'hipofisario',
+            'adrenal', 'petrosos', 'crf', 'cortisona', 'metopirona', 'mifepristona'],
+        parent: null
+    },
+    // ── Feocromocitoma ──
+    {
+        id: 'feocromocitoma',
+        displayName: 'Feocromocitoma y paraganglioma',
+        keywords: ['feocromocitoma', 'paraganglioma', 'catecolaminas', 'metanefrinas',
+            'normetanefrinas', 'vanilmandélico', 'vma', 'tiroxina', 'adrenal', 'paragangliomas',
+            'sdhb', 'sdhd', 'vhl', 'men2', 'ret', 'alfa-metiltirosina', 'fenoxibenzamina'],
+        parent: null
+    },
+    // ── Acromegalia ──
+    {
+        id: 'acromegalia',
+        displayName: 'Acromegalia y exceso de GH',
+        keywords: ['acromegalia', 'gh', 'igf-1', 'somatotrofina', 'octreótido', 'lanreótido',
+            'pegvisomant', 'cabergolina', 'somatostatina', 'ghrh', 'hipófisis', 'adenoma',
+            'prolactina', 'pasireótido'],
+        parent: null
+    },
+    // ── Hipertiroidismo / Hipotiroidismo ──
+    {
+        id: 'tiroides',
+        displayName: 'Trastornos tiroideos',
+        keywords: ['tsh', 't3', 't4', 'tiroideo', 'tiroides', 'hipertiroidismo', 'hipotiroidismo',
+            'hashimoto', 'graves', 'bocio', 'levotiroxina', 'metimazol', 'propranolol',
+            'yodo', 'tiroglobulina', 'tiroperoxidasa', 'tpo', 'tab', 'trab'],
+        parent: null
+    },
+    // ── Exceso de mineralocorticoides no aldosterona ──
+    {
+        id: 'mineralocorticoides',
+        displayName: 'Exceso de mineralocorticoides no aldosterona',
+        keywords: ['ame', 'regaliz', '11β-hidroxiesteroide', '11β-hsd', 'déficit', 'appa',
+            'hipertensión', 'mineralocorticoide', 'corticosterona', 'doc', 'deoxicorticosterona',
+            'congenito', 'congénita', 'liiddle', 'amiloride'],
+        parent: null
+    },
+    // ── Esteroidogénesis ──
+    {
+        id: 'esteroidogenesis',
+        displayName: 'Esteroidogénesis adrenal',
+        keywords: ['esteroidogénesis', 'colesterol', 'pregnenolona', 'progesterona',
+            'mitocondria', 'scca', 'scap', 'stAR', '3β-hsd', '21-hidroxilasa', '11β-hidroxilasa',
+            '17α-hidroxilasa', 'cyp11a1', 'cyp21a2', 'cyp11b1', 'cortisol', 'andrógenos',
+            'dhea', 'androstenediona', 'testosterona', 'aldosterona', 'zona', 'glomerulosa',
+            'fasciculada', 'reticular'],
+        parent: null
+    },
+    // ── Hipertensión endocrina (general) ──
+    {
+        id: 'hta_endocrina',
+        displayName: 'Hipertensión de origen endocrino',
+        keywords: ['hipertensión', 'endocrina', 'endocrino', 'secundaria', 'screening',
+            'tamizaje', 'causas', 'renovascular', 'renal', 'parenquimatosa', 'coartación',
+            'apnea', 'sueño', 'obesidad', 'metabólico', 'insulinorresistencia', 'diabetes'],
+        parent: null
+    },
+    // ── Hipogonadismo / Eje gonadal ──
+    {
+        id: 'gonadal',
+        displayName: 'Eje gonadal y hipogonadismo',
+        keywords: ['testosterona', 'lh', 'fsh', 'estradiol', 'progesterona', 'hipogonadismo',
+            'hipergonadismo', 'ovario', 'testículo', 'espermatogénesis', 'esperma',
+            'menopausia', 'andropausia', 'clomifeno', 'gonadotrofina', 'hcg', 'pubertad',
+            'precóz', 'tardía', 'klinefelter', 'turner', 'kallmann'],
+        parent: null
+    },
+    // ── Diabetes y metabolismo glucídico ──
+    {
+        id: 'diabetes',
+        displayName: 'Diabetes y metabolismo glucídico',
+        keywords: ['glucemia', 'glucosa', 'insulina', 'diabetes', 'hba1c', 'hemoglobina',
+            'glicosilada', 'metformina', 'sulfonilurea', 'glibenclamida', 'sitagliptina',
+            'sglt2', 'gliflozina', 'liraglutida', 'semaglutida', 'hipoglucemia', 'hiperglucemia',
+            'cetona', 'cetoacidosis', 'hhos', 'hhs', 'glucagón', 'gpp', 'gpr'],
+        parent: null
+    },
+    // ── Metabolismo fosfocálcico / Paratiroides ──
+    {
+        id: 'calcio',
+        displayName: 'Metabolismo fosfocálcico y paratiroides',
+        keywords: ['calcio', 'fósforo', 'fosfato', 'pth', 'parathormona', 'paratiroides',
+            'vitamina', 'colecalciferol', 'calcitriol', 'calcitonina', 'hipercalcemia',
+            'hipocalcemia', 'osteoporosis', 'osteomalacia', 'raquitismo', 'denosumab',
+            'bifosfonato', 'cinacalcet', 'pseudohipoparatiroidismo'],
+        parent: null
+    },
+    // ── Hormona antidiurética / Eje hídrico ──
+    {
+        id: 'hidrico',
+        displayName: 'Regulación hídrica y ADH',
+        keywords: ['adh', 'vasopresina', 'diabetes', 'insípida', 'siadh', 'hipernatremia',
+            'hiponatremia', 'sodio', 'osmolaridad', 'osmolalidad', 'desmopresina', 'ddavp',
+            'diuresis', 'poliuria', 'polidipsia', 'tolvaptán', 'conivaptán'],
+        parent: null
+    }
+];
+
+/**
+ * Clasifica un fragmento de texto en un tema médico según coincidencia de palabras clave.
+ * Devuelve el topic con mayor score o null si no coincide con ninguno.
+ */
+// 🆕 Filtrado guiado: usa apuntes como query para seleccionar chunks relevantes
+// Helper para extraer texto de Blob PDF (usando pdf.js global)
+// Detecta saltos de línea reales por coordenadas Y y párrafos por gaps grandes
 function showToast(msg, type = 'info') {
     const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
-    const color = type === 'success' ? 'bg-emerald-500' : (type === 'error' ? 'bg-red-500' : (type === 'warning' ? 'bg-orange-500' : 'bg-slate-800'));
+    const color = type === 'success' ? 'bg-emerald-500' : (type === 'error' ? 'bg-red-500' : 'bg-slate-800');
     toast.className = `${color} text-white px-4 py-2 rounded-lg shadow-lg text-sm flex items-center gap-2 transform transition-all duration-300 translate-y-10 opacity-0`;
     toast.innerHTML = `<i class="fas ${type==='success'?'fa-check-circle':(type==='error'?'fa-exclamation-circle':'fa-info-circle')}"></i> ${msg}`;
 
@@ -216,13 +354,12 @@ function renderSubjects() {
         let filesHtml = sub.files.map(f => {
             const isActive = currentState.currentFileId === f.id;
             const icon = f.type === 'pdf' ? 'fa-file-pdf text-rose-400' : 'fa-play-circle text-sky-400';
-            // Indicador visual si el archivo está en Drive
-            const driveIcon = f.driveId ? '<i class="fas fa-cloud text-[8px] text-blue-300 absolute bottom-1 right-1"></i>' : '';
             return `
                 <li class="group cursor-pointer rounded-lg flex items-center justify-between p-2 transition-colors ${isActive ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 text-slate-300'}" onclick="openFile('${sub.id}', '${f.id}')">
-                    <div class="flex items-center gap-2 overflow-hidden relative">
-                        <i class="fas ${icon} w-5 text-center text-xs relative">${driveIcon}</i>
+                    <div class="flex items-center gap-2 overflow-hidden">
+                        <i class="fas ${icon} w-5 text-center text-xs"></i>
                         <span class="text-xs truncate hide-on-collapse">${f.name}</span>
+                        ${f.driveId ? '<i class="fas fa-cloud text-blue-400 text-[10px]" title="Guardado en Drive"></i>' : ''}
                     </div>
                     <button onclick="removeFile(event, '${sub.id}', '${f.id}')" class="opacity-0 group-hover:opacity-100 hover:text-red-400 px-1 hide-on-collapse">
                         <i class="fas fa-times text-[10px]"></i>
@@ -279,6 +416,7 @@ function addSubject() {
     renderManageSubjects();
     renderSubjects();
 
+    // Auto-seleccionar la materia creada
     currentState.currentSubject = subId;
     const notesKey = 'sub_' + subId;
     document.getElementById('notes-editor').innerHTML = appData.notes[notesKey] || '';
@@ -286,17 +424,20 @@ function addSubject() {
     document.getElementById('header-icon').className = 'fas fa-pen-nib text-indigo-500';
 
     showToast('Materia creada', 'success');
-    
-    // Forzar guardado a Drive si existe sesión
-    if (window.GoogleDriveSync && window.GoogleDriveSync.isLoggedIn) {
-        if (typeof saveToDrive === 'function') saveToDrive();
-    }
 }
 
 function removeSubject(subId) {
     if (confirm('¿Eliminar esta materia y TODOS sus archivos y apuntes?')) {
         appData.subjects = appData.subjects.filter(s => s.id !== subId);
         delete appData.notes['sub_' + subId];
+
+        // También borrar notas de archivos de esa materia
+        const sub = appData.subjects.find(s => s.id === subId);
+        if (sub) {
+            for (const f of sub.files) {
+                delete appData.notes[f.id];
+            }
+        }
 
         saveData();
 
@@ -308,13 +449,8 @@ function removeSubject(subId) {
 
         renderManageSubjects();
         renderSubjects();
-        if (typeof renderAiSources === 'function') renderAiSources();
+        renderAiSources();
         showToast('Materia eliminada', 'success');
-        
-        // Forzar guardado a Drive
-        if (window.GoogleDriveSync && window.GoogleDriveSync.isLoggedIn) {
-            if (typeof saveToDrive === 'function') saveToDrive();
-        }
     }
 }
 
@@ -332,6 +468,7 @@ function renderManageSubjects() {
     });
 }
 
+// Esta es la función corregida que ahora pide explicitamente el destino
 function openAddFileModal(subId = null) {
     if (appData.subjects.length === 0) {
         showToast('Primero debes crear una materia', 'error');
@@ -339,11 +476,9 @@ function openAddFileModal(subId = null) {
     }
 
     const select = document.getElementById('file-target-subject');
-    if (select) {
-        select.innerHTML = appData.subjects.map(s => 
-            `<option value="${s.id}" ${s.id === subId ? 'selected' : ''}>${s.name}</option>`
-        ).join('');
-    }
+    select.innerHTML = appData.subjects.map(s => 
+        `<option value="${s.id}" ${s.id === subId ? 'selected' : ''}>${s.name}</option>`
+    ).join('');
     
     openModal('add-file-modal');
 }
@@ -368,7 +503,8 @@ async function confirmAddFile() {
         name: customName || 'Documento sin título',
         type: type.includes('pdf') ? 'pdf' : 'video',
         url: '',
-        isLocal: type === 'pdf_local'
+        isLocal: type === 'pdf_local',
+        driveId: null
     };
 
     if (type === 'pdf_local') {
@@ -378,21 +514,20 @@ async function confirmAddFile() {
         const file = input.files[0];
         fileObj.name = customName || file.name;
         
-        // 🚀 LÓGICA DRIVE VS LOCAL
+        // 🚀 LÓGICA DE DRIVE: intentar subir primero a Drive si está logueado
         if (window.GoogleDriveSync && window.GoogleDriveSync.isLoggedIn) {
-            try {
-                // Subir PDF a Google Drive si hay sesión activa
-                const driveId = await uploadPdfToDrive(file, fileObj.name);
-                fileObj.driveId = driveId;
-                fileObj.isLocal = false; // Ya no lo marcamos como local en indexedDB
-            } catch (error) {
-                console.error("Fallo subida a Drive:", error);
-                showToast('Fallo al subir a Drive. Se guardará localmente.', 'warning');
-                await idb.save(fileObj.id, file); 
-                fileObj.isLocal = true;
-            }
+             try {
+                 const driveId = await uploadPdfToDrive(file, fileObj.name);
+                 fileObj.driveId = driveId;
+                 fileObj.isLocal = false; // Como está en drive, ya no cuenta como local exclusivamente
+             } catch (error) {
+                 console.error("Fallo subida a Drive:", error);
+                 showToast('Fallo al subir a Drive. Se guardará localmente.', 'warning');
+                 await idb.save(fileObj.id, file); 
+                 fileObj.isLocal = true;
+             }
         } else {
-            // Guardamos el PDF en IndexedDB (local)
+            // Si no está logueado, guardar el PDF en IndexedDB para que persista localmente
             await idb.save(fileObj.id, file); 
             fileObj.isLocal = true;
         }
@@ -431,7 +566,7 @@ function finalizeAddFile(sub, fileObj) {
     currentState.currentSubject = sub.id;
 
     renderSubjects();
-    if (typeof renderAiSources === 'function') renderAiSources();
+    renderAiSources();
     closeModal('add-file-modal');
 
     document.getElementById('file-name').value = '';
@@ -461,7 +596,7 @@ async function removeFile(e, subId, fileId) {
         delete appData.notes[fileId];
         saveData();
         
-        // Forzar sincronización de metadatos en la nube
+        // Sincronizar inmediatamente
         if (window.GoogleDriveSync && window.GoogleDriveSync.isLoggedIn) {
             if (typeof saveToDrive === 'function') saveToDrive();
         }
@@ -494,13 +629,16 @@ function openGeneralNotes(subId) {
     const sub = appData.subjects.find(s => s.id === subId);
     if (!sub) return;
 
+    // Guardar notas actuales antes de cambiar
     saveCurrentNotes();
 
+    // Cambiar materia actual → misma hoja de apuntes
     currentState.currentSubject = subId;
     currentState.currentFileId = 'gen_' + subId;
     document.getElementById('header-title').textContent = `Notas de ${sub.name}`;
     document.getElementById('header-icon').className = `fas fa-pen-nib text-indigo-500`;
 
+    // Cargar notas de la materia (siempre la misma key: sub_<id>)
     const notesKey = 'sub_' + subId;
     document.getElementById('notes-editor').innerHTML = appData.notes[notesKey] || '';
     renderSubjects();
@@ -521,13 +659,16 @@ async function openFile(subId, fileId) {
     const file = sub.files.find(f => f.id === fileId);
     if (!file) return;
 
+    // Guardar notas actuales antes de cambiar
     saveCurrentNotes();
 
+    // Cambiar materia actual → misma hoja de apuntes
     currentState.currentSubject = subId;
     currentState.currentFileId = fileId;
     document.getElementById('header-title').textContent = `${sub.name} - ${file.name}`;
     document.getElementById('header-icon').className = `fas ${file.type === 'pdf' ? 'fa-file-pdf text-rose-500' : 'fa-play-circle text-sky-500'}`;
 
+    // Cargar notas de la materia (siempre la misma key: sub_<id>)
     const notesKey = 'sub_' + subId;
     document.getElementById('notes-editor').innerHTML = appData.notes[notesKey] || '';
     renderSubjects();
@@ -541,26 +682,26 @@ async function openFile(subId, fileId) {
         videoCont.classList.add('hidden');
         videoCont.innerHTML = '';
         
-        // 🚀 LÓGICA LECTURA DRIVE VS LOCAL
+        // 🚀 LÓGICA DE LECTURA: DRIVE VS LOCAL
         if (file.driveId) {
-            try {
-                showToast('Descargando PDF desde la nube de Drive...', 'info');
-                pdfCanvas.classList.remove('hidden');
-                pdfControls.classList.remove('hidden');
-                
-                const blob = await downloadPdfFromDrive(file.driveId);
-                const url = URL.createObjectURL(blob);
-                
-                const loadingTask = pdfjsLib.getDocument(url);
-                currentState.pdfDoc = await loadingTask.promise;
-                currentState.pageNum = 1;
-                renderPage();
-            } catch (error) {
-                console.error(error);
-                showToast('Error descargando el PDF desde Drive.', 'error');
-            }
-        } 
-        else if (file.isLocal) {
+             try {
+                 showToast('Descargando PDF desde Google Drive...', 'info');
+                 pdfCanvas.classList.remove('hidden');
+                 pdfControls.classList.remove('hidden');
+                 
+                 const blob = await downloadPdfFromDrive(file.driveId);
+                 const url = URL.createObjectURL(blob);
+                 
+                 const loadingTask = pdfjsLib.getDocument(url);
+                 currentState.pdfDoc = await loadingTask.promise;
+                 currentState.pageNum = 1;
+                 renderPage();
+             } catch (error) {
+                 console.error(error);
+                 showToast('Error descargando el PDF desde Drive.', 'error');
+             }
+        } else if (file.isLocal) {
+            // Cargar desde IndexedDB
             const blob = await idb.get(fileId);
             if (!blob) {
                 showEmptyState('Error de lectura', 'El PDF local ya no existe en este dispositivo.');
@@ -577,14 +718,12 @@ async function openFile(subId, fileId) {
             } catch (error) {
                 showToast('Error al leer el PDF.', 'error');
             }
-        } 
-        else if (file.url && file.url.includes('drive.google.com')) {
+        } else if (file.url && file.url.includes('drive.google.com')) {
             pdfCanvas.classList.add('hidden');
             pdfControls.classList.add('hidden');
             videoCont.classList.remove('hidden');
             videoCont.innerHTML = `<iframe src="${file.url}" class="w-full h-full border-0"></iframe>`;
-        } 
-        else {
+        } else {
             pdfCanvas.classList.remove('hidden');
             pdfControls.classList.remove('hidden');
             try {
@@ -648,16 +787,22 @@ function changeZoom(delta) {
 }
 
 // ==========================================
-// 8. NAVEGACIÓN CON TECLADO
+// 8. NAVEGACIÓN CON TECLADO (Ctrl + Flechas)
 // ==========================================
 document.addEventListener('keydown', (e) => {
+    // Ctrl + Flecha izquierda/derecha para cambiar página
     if (e.ctrlKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
         e.preventDefault();
-        if (currentState.pdfDoc) changePage(e.key === 'ArrowRight' ? 1 : -1);
+        if (currentState.pdfDoc) {
+            changePage(e.key === 'ArrowRight' ? 1 : -1);
+        }
     }
+    // Ctrl + Flecha arriba/abajo para zoom
     if (e.ctrlKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
         e.preventDefault();
-        if (currentState.pdfDoc) changeZoom(e.key === 'ArrowUp' ? 0.2 : -0.2);
+        if (currentState.pdfDoc) {
+            changeZoom(e.key === 'ArrowUp' ? 0.2 : -0.2);
+        }
     }
 });
 
@@ -673,6 +818,7 @@ let screenshotSelection = {
     element: null
 };
 
+// Overlay para selección de captura
 const screenshotOverlay = document.createElement('div');
 screenshotOverlay.id = 'screenshot-overlay';
 screenshotOverlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;cursor:crosshair;display:none;';
@@ -684,6 +830,7 @@ selectionBox.id = 'screenshot-selection';
 selectionBox.style.cssText = 'position:absolute;border:2px dashed #fff;background:rgba(255,255,255,0.1);display:none;pointer-events:none;';
 screenshotOverlay.appendChild(selectionBox);
 
+// Iniciar captura con Ctrl + click en el visor PDF
 document.getElementById('media-viewer').addEventListener('mousedown', (e) => {
     if (e.ctrlKey && currentState.pdfDoc) {
         e.preventDefault();
@@ -709,8 +856,10 @@ function startScreenshotCapture(e) {
 
 function updateScreenshotSelection(e) {
     if (!screenshotSelection.active) return;
+    
     const currentX = e.clientX;
     const currentY = e.clientY;
+    
     const left = Math.min(screenshotSelection.startX, currentX);
     const top = Math.min(screenshotSelection.startY, currentY);
     const width = Math.abs(currentX - screenshotSelection.startX);
@@ -734,40 +883,53 @@ async function finishScreenshotCapture(e) {
     const width = Math.abs(screenshotSelection.endX - screenshotSelection.startX);
     const height = Math.abs(screenshotSelection.endY - screenshotSelection.startY);
     
+    // Solo procesar si la selección es lo suficientemente grande
     if (width > 10 && height > 10) {
         try {
             const startX = Math.min(screenshotSelection.startX, screenshotSelection.endX);
             const startY = Math.min(screenshotSelection.startY, screenshotSelection.endY);
             
+            // Verificar si hay un canvas de PDF visible
             const pdfCanvas = document.getElementById('pdf-canvas');
+            const mediaViewer = document.getElementById('media-viewer');
+            
             let imgData;
             
             if (!pdfCanvas.classList.contains('hidden') && currentState.pdfDoc) {
+                // Método 1: Capturar directamente del canvas del PDF
                 const canvasRect = pdfCanvas.getBoundingClientRect();
+                
+                // Calcular la región relativa al canvas
                 const relX = startX - canvasRect.left;
                 const relY = startY - canvasRect.top;
                 const relWidth = Math.min(width, canvasRect.width - relX);
                 const relHeight = Math.min(height, canvasRect.height - relY);
                 
                 if (relX >= 0 && relY >= 0 && relWidth > 0 && relHeight > 0) {
+                    // Crear canvas temporal para la captura
                     const captureCanvas = document.createElement('canvas');
                     captureCanvas.width = relWidth;
                     captureCanvas.height = relHeight;
                     const ctx = captureCanvas.getContext('2d');
                     
+                    // Dibujar la porción del canvas del PDF
                     ctx.drawImage(
                         pdfCanvas,
-                        relX, relY, relWidth, relHeight,
-                        0, 0, relWidth, relHeight
+                        relX, relY, relWidth, relHeight, // Fuente (x, y, width, height)
+                        0, 0, relWidth, relHeight // Destino (x, y, width, height)
                     );
+                    
                     imgData = captureCanvas.toDataURL('image/png');
                 } else {
+                    // Si la selección está fuera del canvas, usar html2canvas
                     imgData = await captureWithHtml2Canvas(startX, startY, width, height);
                 }
             } else {
+                // Método 2: Usar html2canvas para otros elementos
                 imgData = await captureWithHtml2Canvas(startX, startY, width, height);
             }
             
+            // Insertar imagen en el editor de notas
             insertImageInEditor(imgData);
             showToast('Captura insertada en los apuntes', 'success');
         } catch (error) {
@@ -776,6 +938,7 @@ async function finishScreenshotCapture(e) {
         }
     }
     
+    // Limpiar overlay
     screenshotOverlay.style.display = 'none';
     selectionBox.style.display = 'none';
     screenshotSelection.active = false;
@@ -804,6 +967,7 @@ function insertImageInEditor(dataUrl) {
     img.style.cssText = 'max-width:200px;height:auto;display:inline;float:left;margin:0 10px 10px 0;border-radius:4px;cursor:move;';
     img.contentEditable = 'false';
     
+    // Agregar controles de redimensionamiento
     img.addEventListener('click', (e) => {
         e.preventDefault();
         showImageControls(img);
@@ -821,6 +985,7 @@ function insertImageInEditor(dataUrl) {
         editor.appendChild(img);
     }
     
+    // Auto-guardar (por materia, no por archivo)
     clearTimeout(autoSaveTimer);
     autoSaveTimer = setTimeout(() => {
         if (currentState.currentSubject) {
@@ -840,26 +1005,33 @@ let selectedImage = null;
 function showImageControls(img) {
     selectedImage = img;
     
-    if (imageControls) imageControls.remove();
+    // Remover controles anteriores
+    if (imageControls) {
+        imageControls.remove();
+    }
     
     imageControls = document.createElement('div');
     imageControls.style.cssText = 'position:fixed;z-index:1000;background:white;border:1px solid #e2e8f0;border-radius:8px;padding:8px;box-shadow:0 4px 6px rgba(0,0,0,0.1);display:flex;gap:8px;align-items:center;';
     
+    // Botón de alineación izquierda
     const alignLeft = document.createElement('button');
     alignLeft.innerHTML = '<i class="fas fa-align-left"></i>';
     alignLeft.className = 'px-2 py-1 hover:bg-slate-100 rounded';
     alignLeft.onclick = () => { alignImage('left'); };
     
+    // Botón de alineación centrada
     const alignCenter = document.createElement('button');
     alignCenter.innerHTML = '<i class="fas fa-align-center"></i>';
     alignCenter.className = 'px-2 py-1 hover:bg-slate-100 rounded';
     alignCenter.onclick = () => { alignImage('center'); };
     
+    // Botón de alineación derecha
     const alignRight = document.createElement('button');
     alignRight.innerHTML = '<i class="fas fa-align-right"></i>';
     alignRight.className = 'px-2 py-1 hover:bg-slate-100 rounded';
     alignRight.onclick = () => { alignImage('right'); };
     
+    // Slider de tamaño
     const sizeSlider = document.createElement('input');
     sizeSlider.type = 'range';
     sizeSlider.min = '50';
@@ -868,6 +1040,7 @@ function showImageControls(img) {
     sizeSlider.className = 'w-24';
     sizeSlider.oninput = (e) => { resizeImage(parseInt(e.target.value)); };
     
+    // Botón de eliminar
     const deleteBtn = document.createElement('button');
     deleteBtn.innerHTML = '<i class="fas fa-trash text-red-500"></i>';
     deleteBtn.className = 'px-2 py-1 hover:bg-red-50 rounded';
@@ -879,12 +1052,14 @@ function showImageControls(img) {
     imageControls.appendChild(sizeSlider);
     imageControls.appendChild(deleteBtn);
     
+    // Posicionar controles cerca de la imagen
     const rect = img.getBoundingClientRect();
     imageControls.style.left = rect.left + 'px';
     imageControls.style.top = (rect.top - 40) + 'px';
     
     document.body.appendChild(imageControls);
     
+    // Cerrar controles al hacer click fuera
     setTimeout(() => {
         document.addEventListener('click', closeImageControls);
     }, 100);
@@ -928,6 +1103,7 @@ function deleteImage() {
         }
         selectedImage = null;
         
+        // Auto-guardar (por materia)
         clearTimeout(autoSaveTimer);
         autoSaveTimer = setTimeout(() => {
             if (currentState.currentSubject) {
@@ -940,7 +1116,7 @@ function deleteImage() {
 }
 
 // ==========================================
-// 11. ESTILOS CSS PARA IMÁGENES
+// 11. ESTILOS CSS PARA IMÁGENES EN EL EDITOR
 // ==========================================
 const style = document.createElement('style');
 style.textContent = `
@@ -959,6 +1135,20 @@ style.textContent = `
         outline: 2px solid #4f46e5;
         outline-offset: 2px;
     }
+    .image-wrapper {
+        display: inline-block;
+        position: relative;
+        margin: 0 10px 10px 0;
+    }
+    .image-wrapper.float-center {
+        display: block;
+        margin: 0 auto 10px auto;
+        float: none;
+    }
+    .image-wrapper.float-right {
+        float: right;
+        margin: 0 0 10px 10px;
+    }
 `;
 document.head.appendChild(style);
 
@@ -971,18 +1161,26 @@ function exportNotesAsDocx() {
         return showToast('El documento está vacío', 'error');
     }
 
+    // Convertir estilos de Tailwind/propios a estilos en línea que Word pueda entender
     content = content
+        // Títulos principales (h1)
         .replace(/<h1[^>]*>/gi, '<h1 style="font-family: Arial, sans-serif; font-size: 24pt; font-weight: bold; color: #3730a3; margin-top: 24pt; margin-bottom: 12pt; border-bottom: 2pt solid #c7d2fe; padding-bottom: 6pt;">')
+        // Subtítulos (h2)
         .replace(/<h2[^>]*>/gi, '<h2 style="font-family: Arial, sans-serif; font-size: 18pt; font-weight: bold; color: #4338ca; margin-top: 18pt; margin-bottom: 8pt; border-bottom: 1pt solid #e0e7ff; padding-bottom: 4pt;">')
+        // Títulos menores (h3)
         .replace(/<h3[^>]*>/gi, '<h3 style="font-family: Arial, sans-serif; font-size: 14pt; font-weight: bold; color: #1e293b; margin-top: 14pt; margin-bottom: 6pt;">')
+        // Listas (asegurar márgenes en Word)
         .replace(/<ul[^>]*>/gi, '<ul style="margin-top: 6pt; margin-bottom: 6pt; padding-left: 20pt; list-style-type: disc;">')
         .replace(/<ol[^>]*>/gi, '<ol style="margin-top: 6pt; margin-bottom: 6pt; padding-left: 20pt; list-style-type: decimal;">')
         .replace(/<li[^>]*>/gi, '<li style="margin-bottom: 3pt;">')
+        // Párrafos y texto normal
         .replace(/<p[^>]*>/gi, '<p style="margin-top: 6pt; margin-bottom: 6pt; line-height: 1.5;">')
+        // Negritas y cursivas
         .replace(/<strong[^>]*>/gi, '<strong style="font-weight: bold;">')
         .replace(/<b\b[^>]*>/gi, '<b style="font-weight: bold;">')
         .replace(/<em[^>]*>/gi, '<em style="font-style: italic;">')
         .replace(/<i\b[^>]*>/gi, '<i style="font-style: italic;">')
+        // Asegurar saltos de línea (Word entiende <br> pero le damos espaciado)
         .replace(/<br\s*\/?>/gi, '<br style="mso-data-placement:same-cell;" />');
 
     const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' " +
@@ -1001,6 +1199,7 @@ function exportNotesAsDocx() {
     const fileDownload = document.createElement("a");
     fileDownload.href = url;
     const fileName = document.getElementById('header-title').textContent || 'Apuntes';
+    // Limpiar nombre de archivo para evitar caracteres inválidos en Windows
     const safeFileName = fileName.replace(/[<>:"/\\|?*]/g, '');
     fileDownload.download = `Apuntes_${safeFileName}.doc`;
     document.body.appendChild(fileDownload);
@@ -1012,17 +1211,25 @@ function exportNotesAsDocx() {
 }
 
 // ==========================================
-// 6bis. UTILIDADES IA
+// 6bis. UTILIDADES IA: Toggle fuentes y Loading
 // ==========================================
+
+/**
+ * Toggle una fuente en aiSourceFileIds (para checkboxes de fuentes IA)
+ * @param {string} fileId - ID del archivo a togglear
+ */
 function toggleAiSource(fileId) {
     if (aiSourceFileIds.has(fileId)) {
         aiSourceFileIds.delete(fileId);
     } else {
         aiSourceFileIds.add(fileId);
     }
-    if (typeof renderAiSources === 'function') renderAiSources();
+    renderAiSources();
 }
 
+/**
+ * Renderizar la lista de fuentes IA agrupadas por materia
+ */
 function renderAiSources() {
     const container = document.getElementById('ai-sources-list');
     if (!container) return;
@@ -1056,35 +1263,42 @@ function renderAiSources() {
         for (const f of pdfFiles) {
             totalCount++;
             const checked = aiSourceFileIds.has(f.id);
-            // Mostrar un indicativo si es Drive o Local
-            const sourceIcon = f.driveId ? '<i class="fas fa-cloud text-blue-400 text-[10px]"></i>' : '<i class="fas fa-hdd text-slate-400 text-[10px]"></i>';
-            
             html += `
                 <label class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-slate-100 cursor-pointer text-[11px]">
                     <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleAiSource('${f.id}')" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3 h-3">
-                    <span class="truncate text-slate-600 flex-1">${f.name}</span>
-                    ${sourceIcon}
+                    <span class="truncate text-slate-600">${f.name}</span>
                 </label>
             `;
         }
+
         html += `</div></div>`;
     }
 
     if (!html) {
-        html = '<p class="text-xs text-slate-400 italic p-2">No hay archivos PDF.</p>';
+        html = '<p class="text-xs text-slate-400 italic p-2">No hay archivos PDF. Añade archivos a tus materias.</p>';
     }
 
     container.innerHTML = html;
-    const countEl = document.getElementById('ai-source-count');
-    if (countEl) countEl.textContent = `${aiSourceFileIds.size} seleccionada${aiSourceFileIds.size !== 1 ? 's' : ''}`;
-}
 
+    // Actualizar contador global
+    const countEl = document.getElementById('ai-source-count');
+    if (countEl) {
+        countEl.textContent = `${aiSourceFileIds.size} seleccionada${aiSourceFileIds.size !== 1 ? 's' : ''}`;
+    }
+};
+
+/**
+ * Toggle acordeón de fuentes IA por materia
+ */
 function toggleAiSubjectAccordion(subId) {
     if (!currentState.expandedAiSubjects) currentState.expandedAiSubjects = {};
     currentState.expandedAiSubjects[subId] = !currentState.expandedAiSubjects[subId];
     renderAiSources();
 }
 
+/**
+ * Mostrar overlay de loading
+ */
 function showLoading(msg = 'Procesando...') {
     const el = document.getElementById('loading');
     const msgEl = document.getElementById('loading-msg');
@@ -1092,11 +1306,19 @@ function showLoading(msg = 'Procesando...') {
     if (msgEl) msgEl.textContent = msg;
 }
 
+/**
+ * Ocultar overlay de loading
+ */
 function hideLoading() {
     const el = document.getElementById('loading');
     if (el) el.classList.add('hidden');
 }
 
+
+
+// ==========================================
+// Guardar notas actuales inmediatamente
+// ==========================================
 function saveCurrentNotes() {
     const editor = document.getElementById('notes-editor');
     if (!editor || !currentState.currentSubject) return;
@@ -1107,7 +1329,7 @@ function saveCurrentNotes() {
 }
 
 // ==========================================
-// RESUMEN LOCAL SIN IA (Llamada al script aparte)
+// RESUMEN LOCAL SIN IA
 // ==========================================
 async function generarResumenDirecto() {
     try {
@@ -1117,6 +1339,7 @@ async function generarResumenDirecto() {
             showToast('Por favor escribe algunas notas primero', 'warning');
             return;
         }
+        
         if (!currentState.pdfDoc) {
             showToast('Por favor abre un PDF primero', 'warning');
             return;
@@ -1124,6 +1347,7 @@ async function generarResumenDirecto() {
         
         showLoading('🔍 Analizando PDF...');
         
+        // Extraer texto completo del PDF
         let fullText = '';
         const numPages = currentState.pdfDoc.numPages;
         
@@ -1141,20 +1365,31 @@ async function generarResumenDirecto() {
                 pageText += item.str + ' ';
                 lastY = item.transform[5];
             }
+            
             fullText += pageText + '\n\n';
         }
         
         hideLoading();
         
+        // ✅ GENERAR RESUMEN 100% LOCAL SIN IA
         const summary = LocalSummary.generate(fullText, userNotes, 'PRECISE');
         
+        // ✅ MOSTRAR DIRECTAMENTE EL TEXTO LIMPIO
         document.getElementById('ai-fullscreen-title').textContent = '✅ Resumen Generado';
         document.getElementById('ai-fullscreen-content').textContent = summary;
         document.getElementById('ai-fullscreen').classList.remove('hidden');
         
+        // ✅ QUITAR TODO CARTEL VERDE Y MENSAJES DE IA
         document.getElementById('ai-fullscreen-footer').innerHTML = 
             `<span>✅ Listo - Resumen generado completamente localmente sin IA</span>`;
+        
         showToast('✅ Resumen listo', 'success');
+        
+        // ✅ DEBUG EN CONSOLA
+        console.log('📊 INFORMACIÓN DEL RESUMEN:');
+        console.log('   Longitud de tus apuntes:', userNotes.trim().length, 'caracteres');
+        console.log('   Oraciones en el resumen:', summary.split('\n\n').filter(s => s.trim()).length);
+        console.log('   Páginas analizadas:', numPages);
         
     } catch (error) {
         hideLoading();
@@ -1164,7 +1399,7 @@ async function generarResumenDirecto() {
 }
 
 // ==========================================
-// UI PANTALLA COMPLETA
+// UTILIDADES PARA RESUMEN LOCAL
 // ==========================================
 function openAIFullscreen(content, title) {
     document.getElementById('ai-fullscreen-title').textContent = title;
@@ -1200,12 +1435,19 @@ function downloadAIResult() {
     const rawText = document.getElementById('ai-fullscreen-content').innerText;
     if(!rawText.trim()) return showToast('El contenido está vacío', 'error');
 
+    // Convertir el texto plano con saltos de línea a HTML para Word
     const htmlContent = rawText
-        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") 
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") // Escapar HTML
         .split('\n\n').map(p => `<p style="margin-top: 6pt; margin-bottom: 6pt; line-height: 1.5;">${p.replace(/\n/g, '<br style="mso-data-placement:same-cell;" />')}</p>`)
         .join('');
 
-    const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Resultado IA</title><style>body{font-family: Arial, sans-serif; line-height: 1.5; color: #333333; font-size: 11pt;} p{margin:0 0 10pt 0;} </style></head><body>";
+    const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' " +
+        "xmlns:w='urn:schemas-microsoft-com:office:word' " +
+        "xmlns='http://www.w3.org/TR/REC-html40'>" +
+        "<head><meta charset='utf-8'><title>Resultado IA</title>" +
+        "<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->" +
+        "<style>body{font-family: Arial, sans-serif; line-height: 1.5; color: #333333; font-size: 11pt;} p{margin:0 0 10pt 0;} </style>" +
+        "</head><body>";
     const footer = "</body></html>";
     const sourceHTML = header + htmlContent + footer;
     
@@ -1230,8 +1472,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadData();
     await idb.init();
     renderSubjects();
-    if (typeof renderAiSources === 'function') renderAiSources();
+    renderAiSources();
 
+    // Restaurar última materia activa
     if (currentState.currentSubject && appData.subjects.find(s => s.id === currentState.currentSubject)) {
         const sub = appData.subjects.find(s => s.id === currentState.currentSubject);
         const notesKey = 'sub_' + currentState.currentSubject;
@@ -1242,6 +1485,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         showEmptyState('Seleccioná una materia', 'Tus notas y archivos aparecerán aquí.');
     }
 
+    // ── Auto-save al escribir en el editor ──
     const editor = document.getElementById('notes-editor');
     if (editor) {
         editor.addEventListener('input', () => {
@@ -1252,9 +1496,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     appData.notes[notesKey] = editor.innerHTML;
                     saveData();
                 }
-            }, 1500); 
+            }, 1500); // Guardar 1.5s después de dejar de escribir
         });
 
+        // Guardar inmediatamente al salir de la página
         window.addEventListener('beforeunload', () => {
             if (currentState.currentSubject) {
                 const notesKey = 'sub_' + currentState.currentSubject;
@@ -1268,6 +1513,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ==========================================
 // INTEGRACIÓN CON IA (GEMINI)
 // ==========================================
+
 let pendingAIFunction = null;
 
 function requireApiKey(callback) {
@@ -1308,6 +1554,7 @@ async function summarizeWithAI() {
                 showToast('Por favor escribe algunas notas primero para que la IA sepa qué completar.', 'warning');
                 return;
             }
+            
             if (!currentState.pdfDoc) {
                 showToast('Por favor abre un PDF primero', 'warning');
                 return;
@@ -1315,13 +1562,16 @@ async function summarizeWithAI() {
             
             showLoading('🤖 IA analizando y completando tus apuntes...');
             
+            // 1. Extraer texto completo del PDF
             let fullText = '';
             const numPages = currentState.pdfDoc.numPages;
             for (let pageNum = 1; pageNum <= Math.min(numPages, 80); pageNum++) {
                 const page = await currentState.pdfDoc.getPage(pageNum);
                 const textContent = await page.getTextContent();
+                
                 let lastY = -1;
                 let pageText = '';
+                
                 for (const item of textContent.items) {
                     if (lastY !== -1 && Math.abs(item.transform[5] - lastY) > 10) {
                         pageText += '\n\n';
@@ -1329,11 +1579,14 @@ async function summarizeWithAI() {
                     pageText += item.str + ' ';
                     lastY = item.transform[5];
                 }
+                
                 fullText += pageText + '\n\n';
             }
             
+            // 2. Extraer contexto local (lo que extrajimos) usando el motor de resumen
             const extractedContext = LocalSummary.generate(fullText, userNotes, 'PRECISE');
             
+            // 3. Prompt para Gemini
             const prompt = `Actúa como un profesor experto y creador de material de estudio universitario.
 Tu tarea es tomar los apuntes iniciales del alumno y transformarlos en un APUNTE COMPLETO, DETALLADO y EXTENSO utilizando la información extraída del libro/documento como base principal de conocimiento.
 
@@ -1344,13 +1597,14 @@ ${extractedContext.substring(0, 20000)}
 ${userNotes}
 
 INSTRUCCIONES CRÍTICAS:
-1. El resultado debe ser una GUÍA DE ESTUDIO MUY EXTENSA Y DETALLADA. Redacta párrafos completos.
-2. Expande cada tema mencionado usando TODO el detalle anatómico, fisiológico y clínico disponible en el contexto.
-3. Estructura el texto claramente usando TÍTULOS EN MAYÚSCULAS y doble salto de línea (Enter).
-4. NO uses formato Markdown con asteriscos (**) ni numerales (#). 
-5. Mantén un tono académico y explicativo. Escribe de manera fluida y narrativa.
-6. Devuelve ÚNICAMENTE el texto de los apuntes mejorados.`;
+1. El resultado debe ser una GUÍA DE ESTUDIO MUY EXTENSA Y DETALLADA (como si fuera un capítulo de un libro). NO hagas un resumen corto ni uses viñetas excesivas. Redacta párrafos completos y profundos.
+2. Expande cada tema mencionado en los apuntes del alumno usando TODO el detalle anatómico, fisiológico y clínico disponible en el contexto. No dejes ningún detalle fuera.
+3. Estructura el texto claramente usando TÍTULOS EN MAYÚSCULAS. Usa doble salto de línea (Enter) para separar párrafos de forma clara.
+4. NO uses formato Markdown con asteriscos (**) ni numerales (#). Usa texto simple, mayúsculas para los títulos principales, y listas simples con guiones (-) solo cuando sea estrictamente necesario enumerar.
+5. Mantén un tono académico, profundo, explicativo y exhaustivo. Escribe de manera fluida y narrativa.
+6. Devuelve ÚNICAMENTE el texto de los apuntes mejorados, sin introducciones conversacionales ni saludos.`;
 
+            // 4. Llamada a la API de Gemini
             const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1376,6 +1630,7 @@ INSTRUCCIONES CRÍTICAS:
             
             if (!aiText) throw new Error('La IA no devolvió contenido válido.');
 
+            // Mostrar el resultado
             document.getElementById('ai-fullscreen-title').innerHTML = '<i class="fas fa-magic text-indigo-500"></i> Apuntes Mejorados por IA';
             document.getElementById('ai-fullscreen-content').textContent = aiText;
             document.getElementById('ai-fullscreen-footer').innerHTML = 
@@ -1383,27 +1638,36 @@ INSTRUCCIONES CRÍTICAS:
                  <span class="text-slate-500 text-sm ml-4">Puedes editar el texto arriba antes de guardar.</span>`;
             document.getElementById('ai-fullscreen').classList.remove('hidden');
             
+            // Guardar en variable global para poder reemplazar
             window.lastAiGeneratedNotes = aiText;
+            
             showToast('✅ Apuntes mejorados por IA', 'success');
 
         } catch (error) {
             hideLoading();
             console.error('Error con IA:', error);
             showToast('Error: ' + error.message, 'error');
-            if (error.message.includes('API Key inválida')) openApiModal();
+            if (error.message.includes('API Key inválida')) {
+                openApiModal();
+            }
         }
     });
 }
 
 function replaceNotesWithAI() {
     const editor = document.getElementById('notes-editor');
+    // Tomamos el contenido actual del div, que podría haber sido editado por el usuario
     const finalContent = document.getElementById('ai-fullscreen-content').textContent || document.getElementById('ai-fullscreen-content').innerText;
     
     if (editor && finalContent) {
+        // Convertir formato simple texto/markdown a HTML preservando saltos de línea dobles
         let htmlText = finalContent;
+        
+        // Proteger saltos de línea reemplazándolos temporalmente
         htmlText = htmlText.replace(/\n\n/g, '[[DBL_NEWLINE]]');
         htmlText = htmlText.replace(/\n/g, '[[NEWLINE]]');
         
+        // Convertir títulos en mayúsculas (y que no sean solo una palabra suelta o guiones) a H2
         htmlText = htmlText.replace(/^([A-ZÁÉÍÓÚÑ0-9\s.,:\-()]{5,})(?=\[\[NEWLINE\]\]|\[\[DBL_NEWLINE\]\]|$)/gm, '<h2 class="font-bold text-xl mt-5 mb-2 text-indigo-700 border-b border-indigo-100 pb-1">$1</h2>');
         
         htmlText = htmlText
@@ -1415,14 +1679,16 @@ function replaceNotesWithAI() {
             .replace(/^- (.*$)/gim, '<li class="ml-5 list-disc mb-1">$1</li>')
             .replace(/^\d+\. (.*$)/gim, '<li class="ml-5 list-decimal mb-1">$1</li>');
             
+        // Restaurar saltos de línea como <br>
         htmlText = htmlText.replace(/\[\[DBL_NEWLINE\]\]/g, '<br><br>');
         htmlText = htmlText.replace(/\[\[NEWLINE\]\](?!<li|<h|<br)/g, '<br>');
-        htmlText = htmlText.replace(/\[\[NEWLINE\]\]/g, ''); 
+        htmlText = htmlText.replace(/\[\[NEWLINE\]\]/g, ''); // Limpiar los que quedaron pegados a tags HTML
             
         editor.innerHTML = htmlText;
         showToast('✅ Apuntes actualizados', 'success');
         closeAIFullscreen();
         
+        // Trigger save event
         const event = new Event('input');
         editor.dispatchEvent(event);
     }
@@ -1439,7 +1705,10 @@ async function generateQuiz() {
             
             showLoading('🤖 Generando Cuestionario...');
             
-            const prompt = `Crea un cuestionario de 5 preguntas de opción múltiple (con 4 opciones cada una) para evaluar el conocimiento del alumno sobre los siguientes apuntes. Al final, indica cuáles son las respuestas correctas de forma clara.\n\n📝 APUNTES:\n${userNotes}`;
+            const prompt = `Crea un cuestionario de 5 preguntas de opción múltiple (con 4 opciones cada una) para evaluar el conocimiento del alumno sobre los siguientes apuntes. Al final, indica cuáles son las respuestas correctas de forma clara.
+
+📝 APUNTES:
+${userNotes}`;
 
             const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
                 method: 'POST',
