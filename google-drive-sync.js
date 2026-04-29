@@ -94,6 +94,39 @@ window.GoogleDriveSync = {
                 : '<i class="fas fa-cloud-upload-alt text-slate-500"></i> Local';
             statusEl.title = this.isLoggedIn ? "Guardado automático en Drive activado" : "Usando solo memoria local";
         }
+
+        const btnLogin = document.getElementById('btn-login-drive');
+        const btnLogout = document.getElementById('btn-logout-drive');
+        const modalDesc = document.getElementById('drive-modal-desc');
+        
+        if (btnLogin && btnLogout && modalDesc) {
+            if (this.isLoggedIn) {
+                btnLogin.classList.add('hidden');
+                btnLogout.classList.remove('hidden');
+                modalDesc.textContent = 'Estás conectado a Google Drive. Los cambios se guardan y sincronizan automáticamente.';
+            } else {
+                btnLogin.classList.remove('hidden');
+                btnLogout.classList.add('hidden');
+                modalDesc.textContent = 'Inicia sesión para guardar y sincronizar PDFs y notas en "APP Estudio - Datos".';
+            }
+        }
+    },
+
+    logout() {
+        this.isLoggedIn = false;
+        this.token = null;
+        this.folderId = null;
+        localStorage.removeItem('gdrive_token');
+        if (typeof gapi !== 'undefined' && gapi.client) {
+            gapi.client.setToken(null);
+        }
+        this.updateUI();
+        if (typeof showToast === 'function') {
+            showToast('Sesión de Drive cerrada. Ahora usas almacenamiento local.', 'info');
+        }
+        if (typeof closeModal === 'function') {
+            closeModal('login-modal');
+        }
     },
     
     // 4. Busca la carpeta "APP Estudio - Datos" o la crea si no existe
