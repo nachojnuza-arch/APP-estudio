@@ -9,45 +9,69 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome para íconos -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- html2canvas -->
+    <!-- html2canvas para Capturas de Pantalla -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <!-- PDF.js via CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     
-    <!-- Google Identity Services OAuth 2.0 -->
+    <!-- Google Identity Services y GAPI (Para Google Drive) -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://apis.google.com/js/api.js" async defer></script>
 
-    <!-- MANIFEST PWA -->
-    <link rel="manifest" href="manifest.json" id="pwa-manifest">
-    <meta name="theme-color" content="#0f172a">
-    <meta name="mobile-web-app-capable" content="yes">
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%230f172a'/%3E%3Ctext x='50' y='50' font-family='Arial' font-size='40' fill='white' dominant-baseline='middle' text-anchor='middle'%3EA%3C/text%3E%3C/svg%3E">
-    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%230f172a'/%3E%3Ctext x='50' y='50' font-family='Arial' font-size='40' fill='white' dominant-baseline='middle' text-anchor='middle'%3EA%3C/text%3E%3C/svg%3E">
-
-    <!-- Estilos de la aplicación -->
-    <link rel="stylesheet" href="app.css">
+    <style>
+        /* Estilos personalizados y utilidades de la interfaz */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
+        
+        .collapsed .hide-on-collapse { display: none !important; }
+        .collapsed .center-on-collapse { justify-content: center !important; width: 100% !important; margin: 0 auto !important; }
+        
+        .reading-filter-active #media-viewer { filter: sepia(0.4) brightness(0.95); }
+        .reading-filter-active body { background-color: #fcfaf5; }
+        
+        /* Estilos del editor de apuntes */
+        #notes-editor[contenteditable]:empty::before { content: attr(data-placeholder); color: #94a3b8; font-style: italic; pointer-events: none; display: block; }
+        #notes-editor { outline: none; }
+        #notes-editor img { max-width: 100%; height: auto; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: box-shadow 0.2s; }
+        #notes-editor img:hover { box-shadow: 0 4px 8px rgba(0,0,0,0.2); cursor: pointer; }
+        
+        /* Transiciones suaves */
+        .panel-transition { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px); }
+        
+        /* Scrollbars elegantes */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
 </head>
-<body class="flex">
+<body class="flex h-screen overflow-hidden bg-white text-slate-800">
 
     <!-- Notificaciones Toast -->
-    <div id="toast-container" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-[100] flex flex-col gap-2"></div>
+    <div id="toast-container" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-[100] flex flex-col gap-2 pointer-events-none"></div>
 
     <!-- BARRA LATERAL (Archivos y Materias) -->
-    <aside id="sidebar" class="sidebar w-64 bg-slate-900 text-white flex flex-col flex-shrink-0 z-40 relative overflow-x-hidden transition-all duration-300 h-full">
+    <aside id="sidebar" class="w-64 bg-slate-900 text-white flex flex-col flex-shrink-0 z-40 relative transition-all duration-300 h-full">
         <div class="h-14 flex items-center justify-between px-4 border-b border-slate-800 flex-shrink-0">
             <div class="font-bold tracking-wider text-sm hide-on-collapse flex items-center gap-2">
                 <i class="fas fa-graduation-cap text-indigo-400 text-lg"></i> STUDIO
             </div>
-            <button type="button" onclick="toggleSidebar()" title="Alternar barra lateral" aria-label="Alternar barra lateral" class="text-slate-400 hover:text-white transition-colors center-on-collapse w-full flex justify-end">
+            <button type="button" onclick="toggleSidebar()" title="Alternar barra lateral" class="text-slate-400 hover:text-white transition-colors center-on-collapse w-full flex justify-end">
                 <i class="fas fa-bars"></i>
             </button>
         </div>
 
         <div class="flex-grow overflow-y-auto p-3">
-            <div class="text-[10px] uppercase font-bold text-slate-500 mb-2 px-2 hide-on-collapse">Tus Materias</div>
+            <div class="flex items-center justify-between mb-2 px-2 hide-on-collapse">
+                <div class="text-[10px] uppercase font-bold text-slate-500">Tus Materias</div>
+                <div id="drive-sync-status" class="text-[10px] text-slate-500 cursor-pointer hover:text-white transition-colors" onclick="openModal('login-modal')" title="Sincronización con Drive">
+                    <i class="fas fa-cloud-upload-alt"></i> Local
+                </div>
+            </div>
             <ul id="subject-list" class="space-y-1">
-                <!-- Lista de materias y archivos se generará aquí -->
+                <!-- Se inyecta por JS -->
             </ul>
         </div>
 
@@ -56,7 +80,7 @@
                 <i class="fas fa-plus"></i> <span class="hide-on-collapse">Nuevo Recurso</span>
             </button>
             <button onclick="openModal('manage-subjects-modal')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg py-2 text-sm font-medium transition-colors flex items-center center-on-collapse justify-center gap-2 shadow-sm">
-                <i class="fas fa-cog"></i> <span class="hide-on-collapse">Ajustes / Materias</span>
+                <i class="fas fa-cog"></i> <span class="hide-on-collapse">Ajustes</span>
             </button>
         </div>
     </aside>
@@ -83,13 +107,13 @@
             </div>
         </header>
 
-        <!-- Contenido de Trabajo (Split View) anclado estáticamente al contenedor padre -->
+        <!-- Contenido de Trabajo -->
         <div class="flex-1 flex overflow-hidden relative">
 
             <!-- Visor Izquierdo (Media) -->
             <div id="media-viewer" class="flex-1 bg-slate-100 relative overflow-y-auto flex justify-center items-start panel-transition h-full w-full">
 
-                <!-- Estado Vacío Absoluto y Centrado -->
+                <!-- Estado Vacío -->
                 <div id="empty-state" class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 z-10 m-auto h-full w-full pointer-events-none">
                     <div class="w-20 h-20 bg-white rounded-2xl shadow-sm border border-slate-200 flex items-center justify-center mb-4">
                         <i id="empty-state-icon" class="fas fa-folder-open text-3xl text-indigo-300"></i>
@@ -102,20 +126,26 @@
                 <canvas id="pdf-canvas" class="hidden my-6 shadow-xl border border-slate-200 rounded relative z-20"></canvas>
                 <div id="video-container" class="hidden w-full h-full bg-black relative z-20"></div>
 
-                <!-- Controles PDF Flotantes -->
+                <!-- Controles PDF Flotantes con Navegación Directa -->
                 <div id="pdf-controls" class="hidden fixed bottom-6 left-1/2 transform -translate-x-1/2 glass-panel shadow-lg border border-slate-200 rounded-full px-4 py-2 flex items-center gap-4 text-sm z-30">
-                    <button type="button" onclick="changePage(-1)" title="Página anterior" class="text-slate-600 hover:text-indigo-600"><i class="fas fa-chevron-left"></i></button>
-                    <span id="page-info" class="font-medium text-slate-700 min-w-[60px] text-center">1 / 1</span>
-                    <button type="button" onclick="changePage(1)" title="Página siguiente" class="text-slate-600 hover:text-indigo-600"><i class="fas fa-chevron-right"></i></button>
+                    <button type="button" onclick="changePage(-1)" title="Página anterior" class="text-slate-600 hover:text-indigo-600 px-2"><i class="fas fa-chevron-left"></i></button>
+                    
+                    <div class="flex items-center gap-1">
+                        <input type="number" id="page-input" class="w-12 h-7 text-center text-sm font-medium border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none text-slate-700 bg-white shadow-sm" value="1" min="1" onchange="goToPage(this.value)" onkeydown="if(event.key === 'Enter') goToPage(this.value)">
+                        <span class="text-sm text-slate-500 font-medium whitespace-nowrap">de <span id="page-total">1</span></span>
+                    </div>
+
+                    <button type="button" onclick="changePage(1)" title="Página siguiente" class="text-slate-600 hover:text-indigo-600 px-2"><i class="fas fa-chevron-right"></i></button>
+                    
                     <div class="w-px h-4 bg-slate-300 mx-1"></div>
-                    <button type="button" onclick="changeZoom(-0.2)" title="Disminuir zoom" class="text-slate-600 hover:text-indigo-600"><i class="fas fa-search-minus"></i></button>
-                    <span id="zoom-info" class="text-xs text-slate-500 w-10 text-center">100%</span>
-                    <button type="button" onclick="changeZoom(0.2)" title="Aumentar zoom" class="text-slate-600 hover:text-indigo-600"><i class="fas fa-search-plus"></i></button>
+                    
+                    <button type="button" onclick="changeZoom(-0.2)" title="Disminuir zoom" class="text-slate-600 hover:text-indigo-600 px-1"><i class="fas fa-search-minus"></i></button>
+                    <span id="zoom-info" class="text-xs text-slate-500 w-10 text-center font-medium">100%</span>
+                    <button type="button" onclick="changeZoom(0.2)" title="Aumentar zoom" class="text-slate-600 hover:text-indigo-600 px-1"><i class="fas fa-search-plus"></i></button>
                 </div>
             </div>
 
             <!-- Panel Derecho (Notas e IA) -->
-            <!-- Usamos flex flex-col en lugar de hidden por defecto para mantener su estructura -->
             <div id="notes-panel" class="w-full md:w-[450px] max-w-full border-l border-slate-200 bg-white flex flex-col flex-shrink-0 panel-transition z-20 h-full relative">
                 <!-- Pestañas -->
                 <div class="flex border-b border-slate-200 bg-slate-50 p-1 gap-1 flex-shrink-0">
@@ -131,74 +161,45 @@
                 <div id="tab-content-notes" class="flex-1 flex flex-col overflow-hidden">
                     <div class="border-b border-slate-100 p-2 flex items-center justify-between bg-white flex-shrink-0">
                         <div class="flex gap-1">
-                            <button type="button" title="Negrita" onclick="document.execCommand('bold', false, null)" class="w-8 h-8 rounded hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-bold"></i></button>
-                            <button type="button" title="Cursiva" onclick="document.execCommand('italic', false, null)" class="w-8 h-8 rounded hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-italic"></i></button>
-                            <button type="button" title="Lista con viñetas" onclick="document.execCommand('insertUnorderedList', false, null)" class="w-8 h-8 rounded hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-list-ul"></i></button>
+                            <button type="button" onclick="document.execCommand('bold', false, null)" class="w-8 h-8 rounded hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-bold"></i></button>
+                            <button type="button" onclick="document.execCommand('italic', false, null)" class="w-8 h-8 rounded hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-italic"></i></button>
+                            <button type="button" onclick="document.execCommand('insertUnorderedList', false, null)" class="w-8 h-8 rounded hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-list-ul"></i></button>
                         </div>
                         <div class="flex items-center gap-3">
                             <span id="save-status" class="text-xs text-slate-400"><i class="fas fa-check text-green-500"></i> Guardado</span>
-                            <button type="button" title="Exportar notas como documento Word" onclick="exportNotesAsDocx()" class="text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded transition-colors flex items-center gap-1">
+                            <button type="button" onclick="exportNotesAsDocx()" class="text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded transition-colors flex items-center gap-1">
                                 <i class="fas fa-file-word"></i> Exportar
                             </button>
                         </div>
                     </div>
-                    <div id="notes-editor" contenteditable="true" class="flex-1 p-5 overflow-y-auto" data-placeholder="Comienza a escribir tus apuntes aquí..."></div>
+                    <div id="notes-editor" contenteditable="true" class="flex-1 p-5 overflow-y-auto" data-placeholder="Comienza a escribir tus apuntes aquí (Ctrl + Arrastrar en PDF para capturar pantalla)..."></div>
                 </div>
 
                 <!-- Contenido Pestaña IA -->
                 <div id="tab-content-ai" class="hidden flex-1 flex flex-col overflow-hidden bg-slate-50">
                     <div class="p-4 border-b border-slate-200 bg-white flex justify-between items-center flex-shrink-0">
-                        <label class="block text-xs font-bold text-slate-500 uppercase">Acciones Rápidas</label>
-                        <button onclick="openApiModal()" class="text-slate-400 hover:text-indigo-600 transition-colors text-sm" title="Configurar API Key">
-                            <i class="fas fa-cog"></i> Configuración IA
+                        <label class="block text-xs font-bold text-slate-500 uppercase">Asistente IA</label>
+                        <button onclick="openModal('api-modal')" class="text-slate-400 hover:text-indigo-600 transition-colors text-sm" title="Configurar API Key">
+                            <i class="fas fa-cog"></i> Configuración
                         </button>
                     </div>
-                    <div class="p-4 border-b border-slate-200 bg-white flex-shrink-0">
-                        <button onclick="generarResumenDirecto()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2.5 px-3 rounded shadow-sm transition-colors flex justify-center items-center gap-2 mb-2">
-                            <i class="fas fa-file-alt"></i> Resumen Local (sin IA)
+                    <div class="p-4 bg-white flex-shrink-0 space-y-2">
+                        <button onclick="summarizeWithAI()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2.5 px-3 rounded shadow-sm transition-colors flex justify-center items-center gap-2">
+                            <i class="fas fa-robot"></i> Resumen de mis Apuntes
                         </button>
-                        <button onclick="summarizeWithAI()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2.5 px-3 rounded shadow-sm transition-colors flex justify-center items-center gap-2 mb-2">
-                            <i class="fas fa-robot"></i> Resumen con IA (páginas relevantes)
-                        </button>
-                        <div class="grid grid-cols-2 gap-2">
-                            <button onclick="generateQuiz()" class="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold py-2 px-3 rounded shadow-sm transition-colors flex justify-center items-center gap-2">
-                                <i class="fas fa-question-circle"></i> Quiz IA
-                            </button>
-                            <button onclick="generateLocalQuiz()" class="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold py-2 px-3 rounded shadow-sm transition-colors flex justify-center items-center gap-2">
-                                <i class="fas fa-list-ol"></i> Quiz Local
-                            </button>
-                        </div>
-                        <button onclick="diagnoseAPI()" class="w-full mt-2 text-[10px] text-slate-400 hover:text-indigo-500 flex items-center justify-center gap-1">
-                            <i class="fas fa-stethoscope"></i> Diagnóstico de API
+                        <button onclick="generateQuiz()" class="w-full bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold py-2 px-3 rounded shadow-sm transition-colors flex justify-center items-center gap-2">
+                            <i class="fas fa-question-circle"></i> Crear Quiz de Repaso
                         </button>
                     </div>
-
-                    <!-- Fuentes seleccionables para IA -->
-                    <div class="px-4 py-2 border-b border-slate-200 bg-slate-50 flex-shrink-0">
-                        <div class="flex items-center justify-between mb-1">
-                            <label class="text-[10px] font-bold text-slate-400 uppercase">📚 Fuentes IA</label>
-                            <span id="ai-source-count" class="text-[10px] text-indigo-500 font-medium">0 seleccionadas</span>
-                        </div>
-                        <div id="ai-sources-list" class="max-h-28 overflow-y-auto space-y-0.5">
-                            <p class="text-xs text-slate-400 italic p-1">Cargando fuentes...</p>
-                        </div>
-                    </div>
-
-                    <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
-                        <div class="msg-ai p-3 text-sm shadow-sm">
-                            ¡Hola! Soy tu asistente de estudio. Puedes pedirme que resuma el texto o genere un cuestionario en base a tus apuntes actuales.
-                        </div>
-                    </div>
-
-                    <div id="typing-indicator" class="hidden px-4 pb-2 text-xs text-slate-400 italic animate-pulse flex-shrink-0">
-                        <i class="fas fa-circle-notch fa-spin mr-1"></i> La IA está pensando...
+                    <div class="flex-1 overflow-y-auto p-4 flex items-center justify-center text-center">
+                        <p class="text-xs text-slate-400 max-w-xs">Asegúrate de ingresar tu API Key de Gemini en Configuración para poder generar resúmenes y cuestionarios de tus notas.</p>
                     </div>
                 </div>
             </div>
         </div>
     </main>
 
-    <!-- Loading indicator para procesos de IA -->
+    <!-- Loading Indicator -->
     <div id="loading" class="hidden fixed inset-0 bg-black/50 z-[100] flex items-center justify-center">
         <div class="bg-white rounded-xl p-5 flex items-center gap-3 shadow-2xl">
             <i class="fas fa-spinner fa-spin text-indigo-600 text-xl"></i>
@@ -206,179 +207,107 @@
         </div>
     </div>
 
-    <!-- Pantalla completa para resultados de IA -->
+    <!-- Pantalla completa para resultados IA -->
     <div id="ai-fullscreen" class="hidden fixed inset-0 bg-white z-[200] flex flex-col">
-        <!-- Toolbar superior -->
         <div class="flex items-center justify-between px-4 py-2 border-b border-slate-200 bg-slate-50 flex-shrink-0">
             <div class="flex items-center gap-2">
                 <i class="fas fa-file-alt text-indigo-600"></i>
                 <span id="ai-fullscreen-title" class="font-semibold text-slate-700 text-sm">Resultado</span>
             </div>
             <div class="flex items-center gap-2">
-                <button onclick="downloadAIResult()" class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1" title="Descargar como DOC">
+                <button onclick="downloadAIResult()" class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
                     <i class="fas fa-download"></i> Descargar DOC
                 </button>
-                <button onclick="toggleEditAIResult()" id="ai-edit-btn" class="text-xs bg-slate-600 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1" title="Editar contenido">
-                    <i class="fas fa-edit"></i> Editar
-                </button>
-                <button onclick="closeAIFullscreen()" class="text-xs bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1" title="Cerrar">
+                <button onclick="document.getElementById('ai-fullscreen').classList.add('hidden')" class="text-xs bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
                     <i class="fas fa-times"></i> Cerrar
                 </button>
             </div>
         </div>
-        <!-- Contenido editable -->
-        <div id="ai-fullscreen-content" contenteditable="true" class="flex-1 overflow-y-auto p-6 text-sm text-slate-700 leading-relaxed prose prose-slate max-w-none focus:outline-none whitespace-pre-wrap" style="max-width: 900px; margin: 0 auto; width: 100%;">
-        </div>
-        <!-- Barra inferior con info -->
-        <div id="ai-fullscreen-footer" class="flex-shrink-0 border-t border-slate-200 bg-slate-50 px-4 py-1.5 flex items-center justify-between text-[10px] text-slate-400">
-            <span id="ai-fullscreen-footer-text">✅ Listo - Resumen generado completamente localmente sin IA</span>
-            <span id="ai-fullscreen-time"></span>
-        </div>
+        <div id="ai-fullscreen-content" contenteditable="true" class="flex-1 overflow-y-auto p-6 text-sm text-slate-700 leading-relaxed max-w-4xl mx-auto w-full outline-none"></div>
+        <div id="ai-fullscreen-footer" class="flex-shrink-0 border-t border-slate-200 bg-slate-50 px-4 py-1.5 text-[10px] text-slate-400 flex justify-between"></div>
     </div>
 
-    <!-- MODAL: Gestionar Materias -->
-    <div id="manage-subjects-modal" class="fixed inset-0 modal-overlay hidden z-50 flex justify-center items-center">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
-            <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+    <!-- Modales -->
+    <div id="manage-subjects-modal" class="fixed inset-0 bg-black/50 hidden z-50 flex justify-center items-center">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between">
                 <h3 class="text-lg font-bold text-slate-800">Gestionar Materias</h3>
-                <button type="button" onclick="closeModal('manage-subjects-modal')" class="text-slate-400 hover:text-slate-600" title="Cerrar modal" aria-label="Cerrar modal"><i class="fas fa-times"></i></button>
+                <button onclick="closeModal('manage-subjects-modal')" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
             </div>
             <div class="p-6 space-y-4">
                 <div class="flex gap-2">
-                    <input type="text" id="new-subject-name" class="flex-grow border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Nombre de la nueva materia...">
-                    <button onclick="addSubject()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Añadir</button>
+                    <input type="text" id="new-subject-name" class="flex-grow border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none" placeholder="Nueva materia...">
+                    <button onclick="addSubject()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium">Añadir</button>
                 </div>
                 <div class="max-h-60 overflow-y-auto border border-slate-200 rounded-lg">
-                    <ul id="modal-subject-list" class="divide-y divide-slate-100">
-                        <!-- Lista de materias -->
-                    </ul>
+                    <ul id="modal-subject-list" class="divide-y divide-slate-100"></ul>
                 </div>
-            </div>
-            <div class="bg-slate-50 px-6 py-4 border-t border-slate-100 flex justify-end">
-                <button onclick="closeModal('manage-subjects-modal')" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors">Hecho</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL: Añadir Archivo -->
-    <div id="add-file-modal" class="fixed inset-0 modal-overlay hidden z-50 flex justify-center items-center">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
+    <div id="add-file-modal" class="fixed inset-0 bg-black/50 hidden z-50 flex justify-center items-center">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
             <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-                <h3 class="text-lg font-bold text-slate-800">Añadir Recurso a la Materia</h3>
-                <button type="button" onclick="closeModal('add-file-modal')" class="text-slate-400 hover:text-slate-600" title="Cerrar"><i class="fas fa-times"></i></button>
+                <h3 class="text-lg font-bold text-slate-800">Añadir Recurso</h3>
+                <button onclick="closeModal('add-file-modal')" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
             </div>
             <div class="p-6 space-y-4">
-                
-                <div id="subject-selector-container">
+                <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Materia Destino</label>
-                    <select id="file-target-subject" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-slate-50" title="Selecciona la materia donde guardar el recurso">
-                        <!-- Se llenará dinámicamente -->
-                    </select>
+                    <select id="file-target-subject" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-slate-50 outline-none"></select>
                 </div>
-
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Tipo de Archivo</label>
-                    <select id="file-type" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" onchange="toggleFileInputs()" title="Tipo de Archivo">
-                        <option value="pdf_local">PDF desde mi dispositivo (Permanente)</option>
-                        <option value="pdf_url">PDF desde Enlace (Drive/Web)</option>
-                        <option value="video">Video (YouTube/Link)</option>
+                    <select id="file-type" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none" onchange="document.getElementById('input-local').classList.toggle('hidden', this.value !== 'pdf_local'); document.getElementById('input-url').classList.toggle('hidden', this.value === 'pdf_local');">
+                        <option value="pdf_local">PDF desde mi dispositivo</option>
+                        <option value="pdf_url">PDF desde Enlace (Web)</option>
+                        <option value="video">Video (YouTube)</option>
                     </select>
                 </div>
-                
                 <div id="input-local">
-                    <label for="file-upload" class="block text-sm font-medium text-slate-700 mb-1">Seleccionar Archivo</label>
-                    <input type="file" id="file-upload" accept="application/pdf" title="Seleccionar archivo PDF" aria-label="Seleccionar archivo PDF desde su dispositivo" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer border border-slate-200 rounded-lg p-1">
+                    <input type="file" id="file-upload" accept="application/pdf" class="w-full text-sm text-slate-500 border border-slate-200 rounded-lg p-1">
                 </div>
-                
                 <div id="input-url" class="hidden">
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Enlace (URL)</label>
-                    <input type="url" id="file-url" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="https://...">
+                    <input type="url" id="file-url" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none" placeholder="https://...">
                 </div>
-
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Nombre del tema/documento</label>
-                    <input type="text" id="file-name" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ej: Unidad 1 - Introducción">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Nombre</label>
+                    <input type="text" id="file-name" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none" placeholder="Ej: Unidad 1">
                 </div>
             </div>
             <div class="bg-slate-50 px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-                <button onclick="closeModal('add-file-modal')" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">Cancelar</button>
-                <button onclick="confirmAddFile()" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm">Guardar Recurso</button>
+                <button onclick="closeModal('add-file-modal')" class="px-4 py-2 text-sm bg-slate-200 rounded-lg">Cancelar</button>
+                <button onclick="confirmAddFile()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Guardar</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL: Configurar API Key -->
-    <div id="api-modal" class="fixed inset-0 modal-overlay hidden z-50 flex justify-center items-center">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden p-6 text-center">
-            <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 text-xl">
-                <i class="fas fa-key"></i>
-            </div>
-            <h3 class="text-lg font-bold text-slate-800 mb-2">Configuración IA</h3>
-            <p class="text-sm text-slate-500 mb-6">Ingresa tu API Key de Google Gemini para usar las funciones de resumen y cuestionario.</p>
-            
-            <input type="password" id="api-key-input" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-4 text-center focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="AIzaSy...">
-            
-            <button onclick="saveApiKey()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg py-2 transition-colors mb-2">Guardar y Continuar</button>
-            <button onclick="closeModal('api-modal')" class="w-full text-slate-400 hover:text-slate-600 text-sm font-medium py-2">Cancelar</button>
+    <div id="api-modal" class="fixed inset-0 bg-black/50 hidden z-50 flex justify-center items-center">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 text-center">
+            <h3 class="text-lg font-bold text-slate-800 mb-2">Configuración IA (Gemini)</h3>
+            <input type="password" id="api-key-input" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-4 text-center outline-none" placeholder="Ingresa tu API Key de Gemini">
+            <button onclick="saveApiKey()" class="w-full bg-indigo-600 text-white font-semibold rounded-lg py-2 mb-2">Guardar</button>
+            <button onclick="closeModal('api-modal')" class="w-full text-slate-400 text-sm">Cancelar</button>
         </div>
     </div>
 
-    <!-- MODAL: Captura de Pantalla -->
-    <div id="screenshot-modal" class="fixed inset-0 modal-overlay hidden z-50 flex justify-center items-center">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
-            <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-                <h3 class="text-lg font-bold text-slate-800">Captura de Pantalla</h3>
-                <button type="button" onclick="closeModal('screenshot-modal')" class="text-slate-400 hover:text-slate-600" title="Cerrar modal" aria-label="Cerrar ventana de captura de pantalla"><i class="fas fa-times"></i></button>
-            </div>
-            <div class="p-6">
-                <p class="text-sm text-slate-600 mb-4">Presiona <kbd class="px-2 py-1 bg-slate-200 rounded text-xs font-mono">Ctrl</kbd> y arrastra el mouse sobre el documento para seleccionar un área.</p>
-                <div id="screenshot-preview" class="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center text-slate-400">
-                    <i class="fas fa-camera text-3xl mb-2"></i>
-                    <p class="text-sm">El área seleccionada aparecerá aquí</p>
-                </div>
-                <div class="mt-4 flex gap-2">
-                    <button onclick="insertScreenshotAsImage()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm font-medium transition-colors">
-                        <i class="fas fa-image mr-1"></i> Insertar como Imagen
-                    </button>
-                    <button onclick="closeModal('screenshot-modal')" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 py-2 rounded-lg text-sm font-medium transition-colors">
-                        Cancelar
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL: Login Google Drive -->
-    <div id="login-modal" class="fixed inset-0 modal-overlay z-50 flex justify-center items-center bg-slate-900/90 hidden">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all p-8 text-center">
-            <div class="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <i class="fas fa-cloud text-white text-3xl"></i>
-            </div>
-            
-            <h2 class="text-xl font-bold text-slate-800 mb-2">Sincronizar con Google Drive</h2>
-            <p class="text-sm text-slate-500 mb-6">Inicia sesión con tu cuenta de Google para guardar y sincronizar todos tus apuntes en la nube automáticamente.</p>
-            
-            <button onclick="loginWithGoogle()" class="w-full bg-white hover:bg-slate-50 text-slate-700 font-semibold py-3 px-4 border border-slate-300 rounded-lg shadow-sm transition-colors flex items-center justify-center gap-3">
-                <svg viewBox="0 0 24 24" class="w-5 h-5">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                    <path d="M1 1h22v22H1z" fill="none"/>
-                </svg>
-                Iniciar sesión con Google
+    <div id="login-modal" class="fixed inset-0 bg-slate-900/90 hidden z-50 flex justify-center items-center">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8 text-center">
+            <div class="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4"><i class="fas fa-cloud text-white text-2xl"></i></div>
+            <h2 class="text-xl font-bold text-slate-800 mb-2">Google Drive</h2>
+            <p class="text-sm text-slate-500 mb-6">Inicia sesión para guardar y sincronizar PDFs y notas en "APP Estudio - Datos".</p>
+            <button onclick="window.GoogleDriveSync.login()" class="w-full bg-white border border-slate-300 py-3 rounded-lg flex items-center justify-center gap-3 mb-4 font-semibold text-slate-700 hover:bg-slate-50">
+                <i class="fab fa-google text-red-500"></i> Iniciar sesión
             </button>
-            
-            <button onclick="closeModal('login-modal')" class="w-full mt-4 text-slate-400 hover:text-slate-600 text-sm">Usar solo localmente</button>
-            
-            <div class="mt-6 pt-6 border-t border-slate-100 text-xs text-slate-400">
-                ✅ Los datos se guardan de forma privada en tu Drive, nadie tiene acceso a ellos
-            </div>
+            <button onclick="closeModal('login-modal')" class="text-sm text-slate-400">Usar solo localmente</button>
         </div>
     </div>
 
+    <!-- SCRIPTS MODULARES (Restaurados) -->
     <script src="app.js"></script>
-    <script src="local-summary.js"></script>
+    <script src="ai-original.js"></script>
+    <!-- Tu archivo de resumen local si lo tienes: <script src="local-summary.js"></script> -->
     <script src="google-drive-sync.js"></script>
 </body>
 </html>

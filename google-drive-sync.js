@@ -1,421 +1,265 @@
-/**
- * Sincronización con Google Drive
- * Login OAuth 2.0 + Almacenamiento en la nube del usuario
- */
+// ==========================================
+// MÓDULO DE SINCRONIZACIÓN CON GOOGLE DRIVE
+// ==========================================
+// Utiliza Google Identity Services y GAPI
 
-// Estado global de Google Drive Sync
+// ⚠️ IMPORTANTE PARA WEB: Si subes esto a un hosting público, debes cambiar este ID
+// por uno válido creado en Google Cloud Console (API de Drive activada).
+const CLIENT_ID = '155926821940-m8mfuskn410j57sinnqi3dk2saremkdm.apps.googleusercontent.com'; 
+const SCOPES = 'https://www.googleapis.com/auth/drive.file'; 
+const FOLDER_NAME = 'APP Estudio - Datos';
+const DB_FILENAME = 'workspace_data.json';
+
 window.GoogleDriveSync = {
-    isLoggedIn: false,
-    user: null,
-    accessToken: null,
-    tokenExpiry: null,
-    syncInterval: null,
-    lastSyncTime: null
-};
-
-// 🔑 CONFIGURA TU CLIENT ID AQUI
-const GOOGLE_CLIENT_ID = "155926821940-m8mfuskn410j57sinnqi3dk2saremkdm.apps.googleusercontent.com";
-
-let tokenClient = null;
-
-
- /**
- * ✅ METODO CORRECTO OFICIAL PARA LOGIN Y ACCESO A DRIVE API
- */
-function initGoogleAuth() {
-    tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_CLIENT_ID,
-        // 👇 AQUÍ ESTÁ EL CAMBIO: agregamos 'profile email' al final
-        scope: "https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file profile email",
-        callback: (tokenResponse) => {
-            if (tokenResponse.error) {
-                console.error("❌ Error login", tokenResponse);
-                showToast("Error al iniciar sesión con Google", "error");
-                return;
-            }
-// ... resto del código igual ...
-
-            // ✅ AQUI SI TENEMOS UN ACCESS_TOKEN VALIDO PARA DRIVE API
-            GoogleDriveSync.isLoggedIn = true;
-            GoogleDriveSync.accessToken = tokenResponse.access_token;
-            GoogleDriveSync.tokenExpiry = Date.now() + (tokenResponse.expires_in * 1000);
-            
-            // Obtener datos del usuario
-            fetchGoogleUserInfo();
-            
-            saveGoogleSession();
-            showToast("✅ Conectado correctamente con Google Drive", "success");
-            
-            // Si el modal está abierto, cerrarlo
-            const loginModal = document.getElementById('login-modal');
-            if(loginModal) loginModal.classList.add('hidden');
-            
-            updateUIForLoggedInUser();
-            startAutoSync();
-            loadFromDrive();
-        },
-        error_callback: (err) => {
-            console.error("❌ OAuth Error", err);
-            showToast("Error de autorización Google", "error");
-        }
-    });
-}
-
-/**
- * Iniciar flujo de login cuando el usuario clickea el boton
- */
-function loginWithGoogle() {
-    if (!tokenClient) initGoogleAuth();
-    tokenClient.requestAccessToken({ prompt: "consent" });
-}
-
-/**
- * Obtener datos del perfil del usuario logueado
- */
-async function fetchGoogleUserInfo() {
-    try {
-        const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-            headers: { Authorization: `Bearer ${GoogleDriveSync.accessToken}` }
-        });
-        GoogleDriveSync.user = await res.json();
-        saveGoogleSession();
-    } catch(e) {
-        console.warn("No se pudo obtener info de usuario", e);
-    }
-}
-
-/**
- * Guardar sesión de Google en almacenamiento local
- */
-function saveGoogleSession() {
-    localStorage.setItem('google_session', JSON.stringify({
-        user: GoogleDriveSync.user,
-        accessToken: GoogleDriveSync.accessToken,
-        tokenExpiry: GoogleDriveSync.tokenExpiry,
-        loggedIn: GoogleDriveSync.isLoggedIn
-    }));
-}
-
-/**
- * Cargar sesión guardada al iniciar la aplicación
- */
-function loadGoogleSession() {
-    const savedSession = localStorage.getItem('google_session');
+    isLoggedIn: false, 
+    token: null, 
+    folderId: null,
     
-    if (savedSession) {
-        const session = JSON.parse(savedSession);
-        
-        if (session.loggedIn && session.tokenExpiry > Date.now()) {
-            GoogleDriveSync.isLoggedIn = true;
-            GoogleDriveSync.user = session.user;
-            GoogleDriveSync.accessToken = session.accessToken;
-            GoogleDriveSync.tokenExpiry = session.tokenExpiry;
-            
-            updateUIForLoggedInUser();
-            startAutoSync();
-            
-            console.log("✅ Sesión de Google restaurada automáticamente");
-            return true;
-        }
-    }
-    
-    return false;
-}
-
-/**
- * Actualizar interfaz cuando usuario está logueado
- */
-function updateUIForLoggedInUser() {
-    // Agregar indicador de sincronización en la barra superior
-    const headerRight = document.querySelector('header .flex.items-center.gap-2');
-    if (!headerRight) return;
-    
-    // Eliminar botón anterior si existe
-    const existingSyncBtn = document.getElementById('sync-status-btn');
-    if (existingSyncBtn) existingSyncBtn.remove();
-    
-    // Crear botón de estado sincronización
-    const syncButton = document.createElement('button');
-    syncButton.id = 'sync-status-btn';
-    syncButton.className = 'text-green-500 p-2 rounded-lg transition-colors flex items-center gap-1 text-xs font-medium';
-    syncButton.title = `Conectado como ${GoogleDriveSync.user?.email || 'Usuario'}`;
-    syncButton.innerHTML = `<i class="fas fa-cloud"></i> <span class="hidden sm:inline">Sincronizado</span>`;
-    syncButton.onclick = () => saveToDrive(); // Permitir guardado manual al hacer clic
-    
-    // Insertar antes del resto de botones
-    headerRight.insertBefore(syncButton, headerRight.firstChild);
-}
-
-/**
- * Guardar todos los datos de texto de la aplicación en Google Drive
- */
-async function saveToDrive() {
-    if (!GoogleDriveSync.isLoggedIn) return false;
-    
-    try {
-        const saveStatus = document.getElementById('save-status');
-        if (saveStatus) saveStatus.innerHTML = '<i class="fas fa-sync fa-spin text-indigo-500"></i> Sincronizando...';
-        
-        // 🆕 CORRECCIÓN: Leer exactamente la estructura que usa app.js
-        let appData = JSON.parse(localStorage.getItem('studio_data_v2') || '{"subjects":[],"notes":{}}');
-        appData.syncTimestamp = new Date().toISOString();
-        
-        const existingFile = await findDriveFile('studio_app_backup.json');
-        
-        if (existingFile) {
-            await updateDriveFile(existingFile.id, appData);
+    // 1. Inicializa la API de Google cuando carga la página
+    init() {
+        if(typeof gapi !== 'undefined') {
+            gapi.load('client', () => {
+                gapi.client.init({}).then(() => this.checkExistingToken());
+            });
         } else {
-            await createDriveFile('studio_app_backup.json', appData);
+            console.warn("La API de Google (GAPI) no se cargó correctamente.");
         }
-        
-        GoogleDriveSync.lastSyncTime = Date.now();
-        if (saveStatus) saveStatus.innerHTML = '<i class="fas fa-check text-green-500"></i> Sincronizado con Drive';
-        
-        console.log("✅ Datos base guardados correctamente en Google Drive");
-        return true;
-        
-    } catch (error) {
-        console.error("❌ Error guardando en Drive:", error);
-        const saveStatus = document.getElementById('save-status');
-        if (saveStatus) saveStatus.innerHTML = '<i class="fas fa-exclamation-triangle text-orange-500"></i> Error sincronización';
-        return false;
-    }
-}
-
-/**
- * Cargar datos de texto desde Google Drive
- */
-async function loadFromDrive() {
-    if (!GoogleDriveSync.isLoggedIn) return false;
+    },
     
-    try {
-        showToast("Cargando datos desde Google Drive...", "info");
-        
-        const backupFile = await findDriveFile('studio_app_backup.json');
-        
-        if (backupFile) {
-            const data = await getDriveFileContent(backupFile.id);
-            
-            if (data && data.subjects) {
-                // 🆕 CORRECCIÓN: Guardar en la llave correcta de app.js
-                localStorage.setItem('studio_data_v2', JSON.stringify(data));
-                
-                // Actualizar variables en memoria
-                if (typeof window.appData !== 'undefined') {
-                    window.appData = data;
+    // 2. Verifica si el usuario ya había iniciado sesión antes
+    checkExistingToken() {
+        const storedToken = localStorage.getItem('gdrive_token');
+        if (storedToken) {
+            this.token = storedToken;
+            gapi.client.setToken({ access_token: storedToken });
+            this.validateToken().then(isValid => {
+                if (isValid) {
+                    this.isLoggedIn = true;
+                    this.updateUI();
+                    this.initAppFolder(); // Conecta y descarga los datos
+                } else {
+                    localStorage.removeItem('gdrive_token');
                 }
-                
-                // Refrescar UI
-                if (typeof renderSubjects === 'function') {
-                    renderSubjects();
-                }
-                if (typeof renderAiSources === 'function') {
-                    renderAiSources();
-                }
-                
-                showToast("Datos restaurados correctamente desde Drive", "success");
-                return true;
+            });
+        }
+    },
+    
+    async validateToken() {
+        try {
+            const res = await fetch(`https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${this.token}`);
+            return res.ok;
+        } catch(e) { return false; }
+    },
+    
+    // 3. Flujo principal de Login al hacer clic en el botón
+    login() {
+        if (CLIENT_ID === 'TU_CLIENT_ID_DE_GOOGLE_AQUI') {
+            if(typeof showToast === 'function') {
+                showToast('Aviso: Debes configurar un CLIENT_ID real de Google Cloud en el código para funcionar en la nube.', 'error');
+            } else {
+                alert('Aviso: Debes configurar un CLIENT_ID en google-drive-sync.js');
             }
+            // Si quieres permitir pruebas locales ignorando el login real, descomenta la línea de abajo:
+            // return; 
         }
-        
-        return false;
-        
-    } catch (error) {
-        console.error("❌ Error cargando desde Drive:", error);
-        showToast("No se pudieron cargar los datos desde Drive", "error");
-        return false;
-    }
-}
 
-// ==============================================================
-// 🆕 NUEVAS FUNCIONES PARA MANEJAR PDFs PESADOS EN GOOGLE DRIVE
-// ==============================================================
-
-/**
- * Sube un archivo (PDF) a la carpeta de datos de la app en Google Drive.
- * Se hace en 2 pasos: primero se crea la metadata y luego se sube el contenido binario.
- * @returns {string} El ID del archivo en Google Drive.
- */
-async function uploadPdfToDrive(file, fileName) {
-    if (!GoogleDriveSync.isLoggedIn) throw new Error("No hay sesión en Google Drive");
-
-    showToast(`Subiendo ${fileName} a la nube... Esto puede tardar unos segundos.`, "info");
-
-    // Paso 1: Crear metadatos en Drive (archivo vacío)
-    const metadata = {
-        name: fileName,
-        mimeType: 'application/pdf',
-        parents: ['appDataFolder'] // Lo guardamos en la carpeta oculta de la app
-    };
-
-    const resMetadata = await fetch('https://www.googleapis.com/drive/v3/files', {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${GoogleDriveSync.accessToken}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(metadata)
-    });
-
-    if (!resMetadata.ok) throw new Error("Error creando archivo en Drive");
-    const fileInfo = await resMetadata.json();
-    const driveFileId = fileInfo.id;
-
-    // Paso 2: Subir el contenido binario (Blob/File) usando el ID generado
-    const resUpload = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`, {
-        method: 'PATCH',
-        headers: {
-            'Authorization': `Bearer ${GoogleDriveSync.accessToken}`,
-            'Content-Type': 'application/pdf'
-        },
-        body: file
-    });
-
-    if (!resUpload.ok) throw new Error("Error subiendo el contenido del PDF");
-    
-    console.log(`✅ PDF ${fileName} subido a Drive con ID: ${driveFileId}`);
-    return driveFileId;
-}
-
-/**
- * Descarga el contenido binario de un PDF desde Google Drive
- * @returns {Blob} El archivo PDF listo para usarse
- */
-async function downloadPdfFromDrive(driveFileId) {
-    if (!GoogleDriveSync.isLoggedIn) throw new Error("No hay sesión en Google Drive");
-
-    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`, {
-        headers: {
-            'Authorization': `Bearer ${GoogleDriveSync.accessToken}`
-        }
-    });
-
-    if (!response.ok) {
-        throw new Error("No se pudo descargar el PDF de la nube");
-    }
-
-    return await response.blob();
-}
-
-/**
- * Elimina un archivo permanentemente de la carpeta de la app en Drive
- */
-async function deletePdfFromDrive(driveFileId) {
-    if (!GoogleDriveSync.isLoggedIn) return; // Si no hay sesión, no podemos borrarlo
-
-    try {
-        await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${GoogleDriveSync.accessToken}`
+        const client = google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID, 
+            scope: SCOPES,
+            callback: (response) => {
+                if (response.error) {
+                    console.error("Error en login:", response.error);
+                    if(typeof showToast === 'function') showToast('Error al iniciar sesión', 'error');
+                    return;
+                }
+                
+                this.token = response.access_token;
+                gapi.client.setToken({ access_token: this.token });
+                localStorage.setItem('gdrive_token', this.token);
+                this.isLoggedIn = true;
+                
+                this.updateUI();
+                if(typeof closeModal === 'function') closeModal('login-modal');
+                if(typeof showToast === 'function') showToast('Iniciando Drive. Preparando tu carpeta...', 'success');
+                
+                this.initAppFolder();
             }
         });
-        console.log(`🗑️ PDF eliminado de Drive: ${driveFileId}`);
-    } catch (e) {
-        console.warn("Error borrando el archivo de Drive, tal vez ya no existía.", e);
-    }
-}
-
-// ==============================================================
-// FUNCIONES AUXILIARES DRIVE API (JSON y REST)
-// ==============================================================
-
-async function findDriveFile(fileName) {
-    const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${fileName}'&spaces=appDataFolder`, {
-        headers: { 'Authorization': `Bearer ${GoogleDriveSync.accessToken}` }
-    });
-    const result = await response.json();
-    if (result.files && result.files.length > 0) return result.files[0];
-    return null;
-}
-
-async function createDriveFile(fileName, content) {
-    const boundary = '-------314159265358979323846';
-    const delimiter = "\r\n--" + boundary + "\r\n";
-    const close_delim = "\r\n--" + boundary + "--";
+        client.requestAccessToken();
+    },
     
-    const metadata = {
-        'name': fileName,
-        'mimeType': 'application/json',
-        'parents': ['appDataFolder']
-    };
+    updateUI() {
+        const statusEl = document.getElementById('drive-sync-status');
+        if (statusEl) {
+            statusEl.innerHTML = this.isLoggedIn 
+                ? '<i class="fas fa-cloud text-emerald-400"></i> En línea' 
+                : '<i class="fas fa-cloud-upload-alt text-slate-500"></i> Local';
+            statusEl.title = this.isLoggedIn ? "Conectado a Google Drive" : "Usando solo memoria local";
+        }
+    },
     
-    const multipartRequestBody =
-        delimiter +
-        'Content-Type: application/json\r\n\r\n' +
-        JSON.stringify(metadata) +
-        delimiter +
-        'Content-Type: application/json\r\n\r\n' +
-        JSON.stringify(content) +
-        close_delim;
-    
-    const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${GoogleDriveSync.accessToken}`,
-            'Content-Type': 'multipart/related; boundary="' + boundary + '"'
-        },
-        body: multipartRequestBody
-    });
-    
-    return await response.json();
-}
+    // 4. Busca la carpeta "APP Estudio - Datos" o la crea si no existe
+    async initAppFolder() {
+        if(typeof showLoading === 'function') showLoading('Sincronizando Workspace...');
+        try {
+            let response = await gapi.client.request({
+                path: 'https://www.googleapis.com/drive/v3/files',
+                params: { 
+                    q: `name='${FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`, 
+                    fields: 'files(id, name)' 
+                }
+            });
 
-async function updateDriveFile(fileId, content) {
-    const response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}`, {
-        method: 'PATCH',
-        headers: {
-            'Authorization': `Bearer ${GoogleDriveSync.accessToken}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(content)
-    });
-    return await response.json();
-}
-
-async function getDriveFileContent(fileId) {
-    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-        headers: { 'Authorization': `Bearer ${GoogleDriveSync.accessToken}` }
-    });
-    return await response.json();
-}
-
-function startAutoSync() {
-    if (GoogleDriveSync.syncInterval) clearInterval(GoogleDriveSync.syncInterval);
-    GoogleDriveSync.syncInterval = setInterval(() => {
-        saveToDrive();
-    }, 60000); // 1 minuto
-}
-
-function logoutGoogle() {
-    GoogleDriveSync.isLoggedIn = false;
-    GoogleDriveSync.user = null;
-    GoogleDriveSync.accessToken = null;
-    localStorage.removeItem('google_session');
-    if (GoogleDriveSync.syncInterval) {
-        clearInterval(GoogleDriveSync.syncInterval);
-        GoogleDriveSync.syncInterval = null;
-    }
-    const syncBtn = document.getElementById('sync-status-btn');
-    if (syncBtn) syncBtn.remove();
-    showToast("Sesión de Google cerrada", "info");
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    const sessionRestored = loadGoogleSession();
-    if (!sessionRestored) {
-        setTimeout(() => {
-            const loginModal = document.getElementById('login-modal');
-            if (loginModal && !localStorage.getItem('login_modal_closed')) {
-                loginModal.classList.remove('hidden');
+            if (response.result.files && response.result.files.length > 0) {
+                // La carpeta existe, obtenemos su ID y descargamos datos
+                this.folderId = response.result.files[0].id;
+                console.log("Carpeta de Drive conectada.");
+                await this.syncAppDataFromDrive();
+            } else {
+                // No existe, creamos la carpeta
+                let createRes = await gapi.client.request({
+                    path: 'https://www.googleapis.com/drive/v3/files', 
+                    method: 'POST', 
+                    body: { 
+                        name: FOLDER_NAME, 
+                        mimeType: 'application/vnd.google-apps.folder' 
+                    }
+                });
+                this.folderId = createRes.result.id;
+                console.log("Carpeta de Drive creada.");
+                
+                // Si ya teníamos datos locales (appData está definida en app.js), los subimos
+                if(typeof appData !== 'undefined') await this.syncAppDataToDrive(appData);
             }
-        }, 2000);
-    }
-});
+        } catch(e) { 
+            console.error("Fallo al inicializar la carpeta de Drive", e); 
+            if(typeof showToast === 'function') showToast('Problema de red con Drive', 'error');
+        } finally {
+            if(typeof hideLoading === 'function') hideLoading();
+        }
+    },
+    
+    // 5. Descarga el JSON con tus apuntes desde Drive
+    async syncAppDataFromDrive() {
+        try {
+            let response = await gapi.client.request({
+                path: 'https://www.googleapis.com/drive/v3/files',
+                params: { 
+                    q: `name='${DB_FILENAME}' and '${this.folderId}' in parents and trashed=false`, 
+                    fields: 'files(id)' 
+                }
+            });
 
-document.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && e.key === 's') {
-        e.preventDefault();
-        if (GoogleDriveSync.isLoggedIn) saveToDrive();
+            if (response.result.files && response.result.files.length > 0) {
+                const fileId = response.result.files[0].id;
+                const fileData = await gapi.client.request({ 
+                    path: `https://www.googleapis.com/drive/v3/files/${fileId}`, 
+                    params: { alt: 'media' } 
+                });
+                
+                if (fileData.body) {
+                    // Actualizamos las variables globales de app.js con lo que vino de Drive
+                    const parsedData = JSON.parse(fileData.body);
+                    appData = parsedData; 
+                    localStorage.setItem('studio_data_v2', JSON.stringify(appData));
+                    
+                    // Renderizamos la interfaz
+                    if(typeof renderSubjects === 'function') renderSubjects();
+                    
+                    // Si el usuario tenía una nota abierta, actualizamos el texto de pantalla
+                    if (typeof currentState !== 'undefined' && currentState.currentSubject) {
+                        const editor = document.getElementById('notes-editor');
+                        if(editor) editor.innerHTML = appData.notes['sub_' + currentState.currentSubject] || '';
+                    }
+                    if(typeof showToast === 'function') showToast('Apuntes actualizados desde Drive', 'success');
+                }
+            }
+        } catch(e) { 
+            console.error('No se pudo traer JSON de Drive', e); 
+        }
+    },
+    
+    // 6. Sube tus apuntes (el JSON local) a Drive (Se activa desde app.js cuando dejas de escribir)
+    async syncAppDataToDrive(dataObj) {
+        if (!this.folderId) return;
+        try {
+            // Buscamos si el archivo JSON ya existe para actualizarlo o crearlo nuevo
+            let search = await gapi.client.request({
+                path: 'https://www.googleapis.com/drive/v3/files',
+                params: { 
+                    q: `name='${DB_FILENAME}' and '${this.folderId}' in parents and trashed=false`, 
+                    fields: 'files(id)' 
+                }
+            });
+
+            const content = JSON.stringify(dataObj);
+            const metadata = { name: DB_FILENAME, mimeType: 'application/json' };
+            const form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+            form.append('file', new Blob([content], { type: 'application/json' }));
+            
+            let uploadUrl = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+            let method = 'POST';
+            
+            if (search.result.files && search.result.files.length > 0) {
+                // Actualizar (PATCH)
+                uploadUrl = `https://www.googleapis.com/upload/drive/v3/files/${search.result.files[0].id}?uploadType=multipart`;
+                method = 'PATCH';
+            } else {
+                // Crear (POST) agregando parent ID
+                metadata.parents = [this.folderId];
+                form.set('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+            }
+
+            await fetch(uploadUrl, { 
+                method, 
+                headers: { 'Authorization': 'Bearer ' + this.token }, 
+                body: form 
+            });
+            console.log("Copia de seguridad en Drive actualizada correctamente.");
+            
+        } catch(e) { 
+            console.error('Error guardando JSON en Drive', e); 
+        }
+    },
+    
+    // 7. Sube el PDF a la carpeta de Drive y devuelve el ID
+    async uploadPdfToDrive(fileBlob, fileName) {
+        if (!this.folderId) return null;
+        try {
+            const metadata = { 
+                name: fileName + '.pdf', 
+                mimeType: 'application/pdf', 
+                parents: [this.folderId] 
+            };
+            const form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+            form.append('file', fileBlob);
+            
+            const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                method: 'POST', 
+                headers: { 'Authorization': 'Bearer ' + this.token }, 
+                body: form
+            });
+            
+            const data = await response.json();
+            return data.id; // Retorna el driveId para guardarlo en local
+        } catch(e) { 
+            console.error("Error subiendo PDF a Drive", e);
+            return null; 
+        }
+    },
+    
+    // 8. Descarga un PDF desde Drive usando su ID (Solo pasa si no está en la caché IndexedDB)
+    async downloadPdfFromDrive(fileId) {
+        try {
+            const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, { 
+                headers: { 'Authorization': 'Bearer ' + this.token } 
+            });
+            return response.ok ? await response.blob() : null;
+        } catch(e) { 
+            console.error("Error descargando PDF de Drive", e);
+            return null; 
+        }
     }
-});
+};
