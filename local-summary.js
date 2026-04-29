@@ -416,8 +416,8 @@ class FastTFIDF {
             .replace(/^\s*\d+\s*$/gm, '')
             // Eliminar un solo salto de línea (unir líneas dentro del mismo párrafo), preservando los dobles
             .replace(/([^\n])\n([^\n])/g, '$1 $2')
-            // Eliminar múltiples espacios
-            .replace(/\s{2,}/g, ' ')
+            // Eliminar múltiples espacios (sin tocar saltos de línea)
+            .replace(/[ \t]{2,}/g, ' ')
             // Eliminar paréntesis vacíos o con poco contenido
             .replace(/\([^)]{0,3}\)/g, '')
             .trim();
@@ -497,7 +497,8 @@ class LightweightVectors {
     }
     
     scoreSentences(text, userNotes) {
-        const sentences = text.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 30);
+        // Dividir usando la misma lógica de párrafos enteros que el TF-IDF
+        const sentences = text.split(/\n\n+/).map(s => s.trim()).filter(s => s.length > 60 && s.length < 4000);
         const userVector = this.sentenceVector(userNotes);
         
         if (!userVector) {
