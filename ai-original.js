@@ -2104,37 +2104,81 @@ async function generarResumenDirecto() {
     const userNotes = (subjectNotes + '\n' + editorNotes).trim();
 
     if (!userNotes || userNotes.length < 15) {
-        chat.innerHTML += `<div class="msg-user p-3 shadow-sm text-sm self-end max-w-[85%] rounded-l-xl rounded-tr-xl bg-emerald-600 text-white">Generá un resumen directo de mis PDFs basado en mis apuntes.</div>`;
-        chat.innerHTML += `<div class="msg-ai p-4 shadow-sm text-sm self-start max-w-[95%] rounded-r-xl rounded-tl-xl bg-amber-50 border border-amber-200 text-amber-700">⚠️ <strong>Necesitás escribir apuntes primero.</strong> El sistema busca las páginas del libro que coinciden con tus notas y te las muestra completas.</div>`;
+        chat.innerHTML += `<div class="msg-user p-3 shadow-sm text-sm self-end max-w-[85%] rounded-l-xl rounded-tr-xl bg-emerald-600 text-white">Generá un resumen directo de mis PDFs.</div>`;
+        chat.innerHTML += `<div class="msg-ai p-4 shadow-sm text-sm self-start max-w-[95%] rounded-r-xl rounded-tl-xl bg-amber-50 border border-amber-200 text-amber-700">⚠️ <strong>Necesitás escribir apuntes primero.</strong> El sistema local (sin IA) usa tus apuntes para guiar qué partes del PDF debe resumir.</div>`;
         chat.scrollTop = chat.scrollHeight;
         return;
     }
 
-    chat.innerHTML += `<div class="msg-user p-3 shadow-sm text-sm self-end max-w-[85%] rounded-l-xl rounded-tr-xl bg-emerald-600 text-white">Buscá las páginas más relevantes de mis PDFs para mis apuntes.</div>`;
+    chat.innerHTML += `<div class="msg-user p-3 shadow-sm text-sm self-end max-w-[85%] rounded-l-xl rounded-tr-xl bg-emerald-600 text-white">Generá un resumen local guiado por mis apuntes.</div>`;
     if (typing) typing.classList.remove('hidden');
     chat.scrollTop = chat.scrollHeight;
 
     setTimeout(async () => {
         try {
-            // 🆕 Extraer las 4 páginas más relevantes de los PDFs
-            const result = await extraerPaginasRelevantes(userNotes, 4);
+            // Determinar qué PDFs usar
+            let fileIds = [];
+            if (typeof aiSourceFileIds !== 'undefined' && aiSourceFileIds.size > 0) {
+                fileIds = [...aiSourceFileIds];
+            } else if (currentState.currentSubject) {
+                const sub = appData.subjects.find(s => s.id === currentState.currentSubject);
+                if (sub) {
+                    fileIds = sub.files.filter(f => f.type === 'pdf').map(f => f.id);
+                }
+            }
 
-            if (result.error) {
-                chat.innerHTML += `<div class="msg-ai p-4 shadow-sm text-sm self-start max-w-[95%] rounded-r-xl rounded-tl-xl bg-amber-50 border border-amber-200 text-amber-700">⚠️ ${result.error}</div>`;
+            if (fileIds.length === 0) {
+                chat.innerHTML += `<div class="msg-ai p-4 shadow-sm text-sm self-start max-w-[95%] rounded-r-xl rounded-tl-xl bg-amber-50 border border-amber-200 text-amber-700">⚠️ No hay PDFs seleccionados o en la materia actual para analizar.</div>`;
                 if (typing) typing.classList.add('hidden');
                 chat.scrollTop = chat.scrollHeight;
                 return;
             }
 
-            console.log(`✅ ${result.pagesExtracted} páginas extraídas de ${result.totalPages} con coincidencias`);
+            let combinedText = '';
+            for (const fileId of fileIds) {
+                try {
+                    const blob = await window.GoogleDriveSync.getFile(fileId);
+                    const arrayBuffer = await blob.arrayBuffer();
+                    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+                    const doc = await loadingTask.promise;
+                    
+                    const maxPages = Math.min(30, doc.numPages); // Extraer hasta 30 páginas para no saturar memoria
+                    for (let i = 1; i <= maxPages; i++) {
+                        const page = await doc.getPage(i);
+                        const textContent = await page.getTextContent();
+                        const pageText = textContent.items.map(item => item.str).join(' ');
+                        combinedText += pageText + ' \n\n ';
+                    }
+                } catch (err) {
+                    console.warn('No se pudo extraer texto de', fileId, err);
+                }
+            }
 
-            // Construir HTML del resultado
-            const htmlContent = buildPageSummaryHTML(result, userNotes);
-            openAIFullscreen(htmlContent, `📄 ${result.pagesExtracted} páginas relevantes encontradas`);
+            if (combinedText.trim().length < 50) {
+                chat.innerHTML += `<div class="msg-ai p-4 shadow-sm text-sm self-start max-w-[95%] rounded-r-xl rounded-tl-xl bg-amber-50 border border-amber-200 text-amber-700">⚠️ No se pudo extraer texto de los PDFs.</div>`;
+                if (typing) typing.classList.add('hidden');
+                chat.scrollTop = chat.scrollHeight;
+                return;
+            }
 
-            const statsText = result.stats.map(s => `${s.file} p.${s.page} (${s.matches} matches)`).join(', ');
-            chat.innerHTML += `<div class="msg-ai p-4 shadow-sm text-sm self-start max-w-[95%] rounded-r-xl rounded-tl-xl leading-relaxed bg-emerald-50 border border-emerald-200">✅ <strong>${result.pagesExtracted} páginas</strong> más relevantes extraídas. Abrí pantalla completa para estudiar.<br><small class="text-slate-500">${statsText}</small></div>`;
-            showToast(`✅ ${result.pagesExtracted} páginas encontradas`, 'success');
+            // Usar el sistema de resúmenes locales
+            const summaryText = window.LocalSummary.generate(combinedText, userNotes, 'PRECISE');
+
+            // Formatear para HTML
+            const htmlContent = `
+                <div class="bg-emerald-50 border-2 border-emerald-300 rounded-lg p-5 mb-6 sticky top-0 z-10 shadow-sm">
+                    <h3 class="font-bold text-emerald-800 text-xl mb-2">📄 Resumen Local (TF-IDF)</h3>
+                    <p class="text-sm text-emerald-700">Generado usando tus apuntes como guía principal.</p>
+                </div>
+                <div class="prose prose-emerald max-w-none">
+                    ${summaryText.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>')}
+                </div>
+            `;
+
+            openAIFullscreen(htmlContent, `Resumen Local`);
+
+            chat.innerHTML += `<div class="msg-ai p-4 shadow-sm text-sm self-start max-w-[95%] rounded-r-xl rounded-tl-xl leading-relaxed bg-emerald-50 border border-emerald-200">✅ <strong>Resumen generado</strong> usando el modelo TF-IDF local. Abrí pantalla completa para revisarlo.</div>`;
+            showToast(`✅ Resumen generado exitosamente`, 'success');
 
         } catch (e) {
             console.error('Error resumen directo:', e);
