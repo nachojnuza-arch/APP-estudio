@@ -725,7 +725,7 @@ async function callAIForSummary(extractedText, userNotes) {
         return { success: false, error: 'No hay API Key configurada. Por favor agrégala desde Ajustes de IA.' };
     }
 
-    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
+    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key=${API_KEY}`;
     
     const prompt = `Eres un asistente médico experto en crear resúmenes de estudio.
 

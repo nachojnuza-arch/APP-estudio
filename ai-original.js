@@ -1389,7 +1389,7 @@ html += `<div class="text-green-400">✅ API key: ${masked}</div>`;
 }
 
 // Test directo con modelo fijo (1 sola request)
-    const testModel = "gemini-1.5-flash";
+    const testModel = "gemini-1.5-flash-8b";
 try {
 const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${testModel}:generateContent?key=${apiKey}`, {
     method: 'POST',
@@ -1473,6 +1473,8 @@ throw new Error(`⏱ Rate limit activo. Esperá ${remaining}s más.`);
 return rateLimiter.execute(async () => {
 let lastError;
 
+const fallbackModels = ['gemini-1.5-flash-8b', 'gemini-1.5-flash-latest', 'gemini-1.5-flash'];
+
 for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
         // Verificar forceWaitUntil antes de cada intento
@@ -1481,8 +1483,8 @@ for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
             throw new Error(`⏱ Rate limit activo. Esperá ${remaining}s más.`);
         }
 
-            // 🆕 Usar modelo 1.5 Flash: Mucho más estable en la capa gratuita global
-            const model = 'gemini-1.5-flash';
+            // 🆕 Rotar entre modelos automáticamente si alguno devuelve 404
+            const model = fallbackModels[attempt % fallbackModels.length];
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
 
         const body = {
@@ -1507,6 +1509,13 @@ for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
             // Fallar rápido para no hacer esperar al usuario y lanzar el fallback local
             rateLimiter.forceBlock(60);
             throw new Error('⏱ Límite gratuito de IA alcanzado (429).');
+        }
+
+        // ── Manejo de 404 (Modelo no encontrado) ──
+        if (response.status === 404) {
+            console.warn(`⚠️ Modelo ${model} no encontrado (404). Intentando alternativa...`);
+            if (attempt < MAX_RETRIES) continue; // Pasa al siguiente modelo de la lista
+            throw new Error('Los modelos de IA no están disponibles para esta clave o región (404).');
         }
 
         // ── Otros errores ──
