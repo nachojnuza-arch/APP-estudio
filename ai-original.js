@@ -2276,17 +2276,6 @@ function buildPageSummaryHTML(result, userNotes) {
 function buildAISummaryHTML(aiResult, userNotes, relevantPages) {
     let html = '<div class="space-y-0">';
 
-    // Header
-    html += `<div class="bg-indigo-50 border-2 border-indigo-300 rounded-lg p-5 mb-6 sticky top-0 z-10 shadow-sm">`;
-    html += `<h3 class="font-bold text-indigo-800 text-xl mb-2">🤖 Resumen Generado por Inteligencia Artificial</h3>`;
-    if (relevantPages && !relevantPages.error) {
-        html += `<p class="text-sm text-indigo-700"><strong>${relevantPages.pagesExtracted} páginas relevantes</strong> analizadas · <strong>${relevantPages.totalPages} páginas</strong> escaneadas en total</p>`;
-        html += `<p class="text-xs text-slate-500 mt-2">La IA complementó tus apuntes con el contenido de las páginas más relevantes del libro.</p>`;
-    } else {
-        html += `<p class="text-sm text-amber-700">⚠️ No se encontraron páginas relevantes. Resumen basado solo en tus apuntes.</p>`;
-    }
-    html += `</div>`;
-
     // Tus apuntes (colapsable)
     html += `<details class="mb-5 bg-blue-50 border border-blue-200 rounded-lg">`;
     html += `<summary class="p-3 cursor-pointer font-semibold text-blue-800 text-sm hover:bg-blue-100 rounded-lg"><i class="fas fa-pen-nib mr-1"></i> Ver tus apuntes originales (${userNotes.split('\n').length} líneas)</summary>`;
