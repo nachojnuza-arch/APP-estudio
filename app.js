@@ -103,7 +103,11 @@ function saveCurrentNotes() {
 // ==========================================
 // 4. INTERFAZ Y UTILIDADES
 // ==========================================
-function toggleSidebar() { document.getElementById('sidebar').classList.toggle('collapsed'); document.getElementById('sidebar').classList.toggle('w-16'); }
+function toggleSidebar() { 
+    document.getElementById('sidebar').classList.toggle('collapsed'); 
+    document.getElementById('sidebar').classList.toggle('w-16'); 
+    setTimeout(() => { if (currentState.pdfDoc) renderPage(); }, 300); // Re-renderiza al terminar animación
+}
 function toggleNotesPanel() { document.getElementById('notes-panel').classList.toggle('hidden'); document.getElementById('notes-panel').classList.toggle('flex'); }
 function openModal(id) { document.getElementById(id).classList.remove('hidden'); if(id==='manage-subjects-modal') renderManageSubjects(); }
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
@@ -522,6 +526,13 @@ window.addEventListener('DOMContentLoaded', async () => {
     showEmptyState();
     renderSubjects();
     
+    // Re-renderizado del PDF responsivo (Debounced)
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => { if (currentState.pdfDoc) renderPage(); }, 200);
+    });
+
     if(window.GoogleDriveSync && typeof window.GoogleDriveSync.init === 'function') {
         window.GoogleDriveSync.init();
     }

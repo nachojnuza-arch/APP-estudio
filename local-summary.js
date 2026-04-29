@@ -395,12 +395,12 @@ class FastTFIDF {
     }
     
     splitSentences(text) {
-        // ✅ DIVIDIR POR ORACIONES (separados por puntuación o saltos de línea grandes)
-        const sentences = text.split(/[.!?]+|\n\s*\n/);
+        // ✅ DIVIDIR POR PÁRRAFOS ENTEROS para que la lectura tenga sentido y contexto
+        const sentences = text.split(/\n\n+/);
 
         return sentences
             .map(p => p.trim())
-            .filter(p => p.length > 40 && p.length < 3000); // Oraciones válidas
+            .filter(p => p.length > 60 && p.length < 4000); // Párrafos válidos
     }    
     cleanText(text) {
         // ✅ ELIMINAR BASURA: guiones de salto de línea, números de página, figuras, etc.
@@ -541,7 +541,7 @@ class SummaryEngine {
         
         // ✅ TAMAÑO ADAPTATIVO SEGÚN LARGO DE LOS APUNTES DEL USUARIO
         const notesLength = userNotes.trim().length;
-        const adaptiveSentences = Math.max(7, Math.min(35, Math.floor(notesLength / 55)));
+        const adaptiveSentences = Math.max(4, Math.min(12, Math.floor(notesLength / 150))); // Menos cantidad porque ahora extraemos párrafos enteros
 
         // ✅ LIMPIAR EL TEXTO DEL PDF ANTES DE PROCESAR
         const cleanedText = this.tfidf.cleanText(text);
@@ -570,10 +570,8 @@ class SummaryEngine {
         // ✅ DEBUG: Mostrar información en consola
         console.log('📊 Resumen generado:');
         console.log('   Longitud apuntes:', notesLength, 'caracteres');
-        console.log('   Oraciones seleccionadas:', adaptiveSentences);
-        console.log('   Oraciones en resumen:', topSentences.length);
-        
-        return summary;
+        console.log('   Párrafos seleccionados:', adaptiveSentences);
+        console.log('   Párrafos en resumen:', topSentences.length);
         
         this.history.add({
             title: `Resumen ${new Date().toLocaleDateString()}`,
@@ -720,10 +718,12 @@ class SummaryHistory {
 // IA PARA REORDENAR Y HACER LEGIBLE EL RESUMEN
 // ==========================================
 async function callAIForSummary(extractedText, userNotes) {
-    // Leer API keys desde el archivo APIKEY.env (simulado en cliente)
-    // Usamos Gemini API (gratuita y rápida)
-    
-    const API_KEY = 'AIzaSyAgCKSxLz6ndZblOrhZkhi0DYTlmaQnwSk'; // Gemini
+    // Usamos la API Key guardada por el usuario en localStorage
+    const API_KEY = localStorage.getItem('gemini_api_key');
+    if (!API_KEY) {
+        return { success: false, error: 'No hay API Key configurada. Por favor agrégala desde Ajustes de IA.' };
+    }
+
     const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
     
     const prompt = `Eres un asistente médico experto en crear resúmenes de estudio.

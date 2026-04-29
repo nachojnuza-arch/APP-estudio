@@ -2150,10 +2150,6 @@ async function generarResumenDirecto() {
 
             // Formatear para HTML
             const htmlContent = `
-                <div class="bg-emerald-50 border-2 border-emerald-300 rounded-lg p-5 mb-6 sticky top-0 z-10 shadow-sm">
-                    <h3 class="font-bold text-emerald-800 text-xl mb-2">📄 Resumen Local (TF-IDF)</h3>
-                    <p class="text-sm text-emerald-700">Generado usando tus apuntes como guía principal.</p>
-                </div>
                 <div class="prose prose-emerald max-w-none">
                     ${summaryText.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>')}
                 </div>

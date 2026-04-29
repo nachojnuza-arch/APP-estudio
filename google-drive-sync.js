@@ -208,14 +208,22 @@ window.GoogleDriveSync = {
                 form.set('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
             }
 
-            await fetch(uploadUrl, { 
+            const res = await fetch(uploadUrl, { 
                 method, 
                 headers: { 'Authorization': 'Bearer ' + this.token }, 
                 body: form 
             });
+            if (res.status === 401) throw { status: 401, message: 'Unauthorized' };
             console.log("Copia de seguridad del Workspace actualizada en Drive.");
             
         } catch(e) { 
+            if (e && e.status === 401) {
+                console.warn("Token de Google expirado (401).");
+                this.isLoggedIn = false;
+                localStorage.removeItem('gdrive_token');
+                this.updateUI();
+                if(typeof showToast === 'function') showToast('Sesión de Drive expirada. Vuelve a conectar.', 'error');
+            }
             console.error('Error guardando JSON en Drive', e); 
         }
     },
