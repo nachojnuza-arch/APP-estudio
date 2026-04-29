@@ -1694,29 +1694,19 @@ function summarizeWithAI() {
                 contextMsg = `⚠️ Resumen basado solo en tus apuntes (sin resultados en PDFs).`;
             }
 
-            const prompt = `Actúa como un tutor académico experto. Mi objetivo es tener un material de estudio perfecto.
+            const prompt = `INSTRUCCIONES CRÍTICAS:
+1. El resultado debe ser una GUÍA DE ESTUDIO MUY EXTENSA Y DETALLADA (como si fuera un capítulo de un libro). NO hagas un resumen corto ni uses viñetas excesivas. Redacta párrafos completos y profundos.
+2. Expande cada tema mencionado en los apuntes del alumno usando TODO el detalle anatómico, fisiológico y clínico disponible en el contexto. No dejes ningún detalle fuera.
+3. Estructura el texto claramente usando TÍTULOS EN MAYÚSCULAS. Usa doble salto de línea (Enter) para separar párrafos de forma clara.
+4. NO uses formato Markdown con asteriscos (**) ni numerales (#). Usa texto simple, mayúsculas para los títulos principales, y listas simples con guiones (-) solo cuando sea estrictamente necesario enumerar.
+5. Mantén un tono académico, profundo, explicativo y exhaustivo. Escribe de manera fluida y narrativa.
+6. Devuelve ÚNICAMENTE el texto de los apuntes mejorados, sin introducciones conversacionales ni saludos.
 
 📝 MIS APUNTES ORIGINALES:
 ${allNotes.length > 2000 ? allNotes.slice(0, 2000) + '...' : allNotes}
 
 📚 CONTEXTO DEL LIBRO (Fragmentos extraídos):
-${contextForAI}
-
-TU TAREA:
-1. Analizar mis apuntes y compararlos con el contexto del libro.
-2. CORREGIR cualquier error conceptual, imprecisión o dato erróneo que yo haya escrito.
-3. COMPLETAR mis apuntes agregando la información crucial del libro que me faltó anotar.
-4. Generar el MATERIAL DE ESTUDIO DEFINITIVO, bien estructurado y fácil de leer.
-
-FORMATO DE SALIDA ESTRICTO:
-### 🛠️ Correcciones y Observaciones
-(Menciona brevemente si cometí algún error en mis apuntes y cuál es la versión correcta. Si estaban bien, dilo).
-### 📖 Material de Estudio Extendido
-(Desarrolla el tema de forma completa, clara y estructurada. Usa viñetas, subtítulos y **negritas**. Integra mis apuntes con la información nueva del contexto).
-### 🧠 Glosario Clave
-(3 a 5 definiciones fundamentales que debo recordar).
-
-Respuesta en español:`;
+${contextForAI}`;
 
             console.log(`📏 Prompt size: ~${Math.ceil(prompt.length / 4)} tokens`);
 
