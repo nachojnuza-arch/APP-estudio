@@ -439,7 +439,8 @@ async function extractGuidedSources(notesText, options = {}) {
 
             if (file.driveId) {
                 console.log(`☁️ Descargando ${file.name} desde Google Drive para la IA...`);
-                const blob = await downloadPdfFromDrive(file.driveId);
+                // CORRECCIÓN: Llamando a GoogleDriveSync correctamente
+                const blob = await window.GoogleDriveSync.downloadPdfFromDrive(file.driveId);
                 if (!blob) continue;
                 fullText = await extractTextFromBlob(blob);
             } else if (file.isLocal) {
@@ -784,7 +785,8 @@ async function extraerPaginasRelevantes(userNotes, maxPaginas = 4) {
         try {
             let blob;
             if (file.driveId) {
-                blob = await downloadPdfFromDrive(file.driveId);
+                // CORRECCIÓN: Llamando a GoogleDriveSync correctamente
+                blob = await window.GoogleDriveSync.downloadPdfFromDrive(file.driveId);
             } else {
                 blob = await idb.get(fileId);
             }
@@ -1847,7 +1849,8 @@ async function extraerParrafosComoResumen(pdfSource = null) {
         try {
             let blob;
             if (file.driveId) {
-                blob = await downloadPdfFromDrive(file.driveId);
+                // CORRECCIÓN: Usando window.GoogleDriveSync.downloadPdfFromDrive
+                blob = await window.GoogleDriveSync.downloadPdfFromDrive(file.driveId);
             } else {
                 blob = await idb.get(fileId);
             }
