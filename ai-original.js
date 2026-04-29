@@ -1389,7 +1389,7 @@ html += `<div class="text-green-400">✅ API key: ${masked}</div>`;
 }
 
 // Test directo con modelo fijo (1 sola request)
-const testModel = "gemini-2.0-flash";
+    const testModel = "gemini-1.5-flash";
 try {
 const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${testModel}:generateContent?key=${apiKey}`, {
     method: 'POST',
@@ -1481,7 +1481,8 @@ for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
             throw new Error(`⏱ Rate limit activo. Esperá ${remaining}s más.`);
         }
 
-        const model = 'gemini-2.0-flash';
+            // 🆕 Usar modelo 1.5 Flash: Mucho más estable en la capa gratuita global
+            const model = 'gemini-1.5-flash';
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
 
         const body = {
@@ -1503,33 +1504,9 @@ for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
 
         // ── Manejo de 429 ──
         if (response.status === 429) {
-            // Leer Retry-After header si existe
-            const retryAfter = response.headers.get('Retry-After');
-            const resetHeader = response.headers.get('x-ratelimit-reset');
-
-            let waitSeconds;
-            if (retryAfter) {
-                waitSeconds = parseInt(retryAfter, 10);
-            } else if (resetHeader) {
-                const resetMs = parseInt(resetHeader, 10);
-                waitSeconds = Math.ceil((resetMs - Date.now()) / 1000);
-            } else {
-                // Backoff exponencial: 15s, 30s, 60s
-                waitSeconds = 15 * Math.pow(2, attempt);
-            }
-
-            waitSeconds = Math.max(waitSeconds, 15); // mínimo 15s
-            console.warn(`🚫 429 en intento ${attempt + 1}. Wait: ${waitSeconds}s`);
-
-            rateLimiter.forceBlock(waitSeconds);
-
-            if (attempt < MAX_RETRIES) {
-                // Esperar y reintentar
-                await new Promise(r => setTimeout(r, (waitSeconds + 2) * 1000));
-                continue;
-            }
-
-            throw new Error('⏱ Límite gratuito alcanzado. Esperá unos minutos antes de intentar de nuevo.');
+            // Fallar rápido para no hacer esperar al usuario y lanzar el fallback local
+            rateLimiter.forceBlock(60);
+            throw new Error('⏱ Límite gratuito de IA alcanzado (429).');
         }
 
         // ── Otros errores ──
@@ -1713,6 +1690,14 @@ Respuesta en español:`;
 
         } catch (e) {
             console.error('Error en IA:', e);
+            
+            // 🆕 Fallback automático a motor local
+            if (e.message.includes('Límite') || e.message.includes('429')) {
+                chat.innerHTML += `<div class="msg-ai border-amber-200 bg-amber-50 text-amber-700 p-3 shadow-sm text-sm self-start rounded-xl"><i class="fas fa-bolt"></i> Límite gratuito de Google alcanzado. Generando resumen local offline...</div>`;
+                setTimeout(generarResumenDirecto, 100);
+                return;
+            }
+
             chat.innerHTML += `<div class="msg-ai border-red-200 bg-red-50 text-red-700 p-3 shadow-sm text-sm self-start rounded-xl"><i class="fas fa-exclamation-triangle"></i> ${e.message}</div>`;
             showToast('⚠️ Error al generar resumen', 'error');
         } finally {
@@ -1766,6 +1751,14 @@ function generateQuiz() {
 
         } catch (e) {
             console.error('Error en IA:', e);
+            
+            // 🆕 Fallback automático a motor local
+            if (e.message.includes('Límite') || e.message.includes('429')) {
+                chat.innerHTML += `<div class="msg-ai border-amber-200 bg-amber-50 text-amber-700 p-3 shadow-sm text-sm self-start rounded-xl"><i class="fas fa-bolt"></i> Límite gratuito de Google alcanzado. Generando quiz local offline...</div>`;
+                setTimeout(generateLocalQuiz, 100);
+                return;
+            }
+
             chat.innerHTML += `<div class="msg-ai border-red-200 bg-red-50 text-red-700 p-3 shadow-sm text-sm self-start rounded-xl"><i class="fas fa-exclamation-triangle"></i> ${e.message}</div>`;
             showToast('⚠️ Error al generar quiz', 'error');
         } finally {
