@@ -1389,7 +1389,7 @@ html += `<div class="text-green-400">✅ API key: ${masked}</div>`;
 }
 
 // Test directo con modelo fijo (1 sola request)
-const testModel =  "gemini-2.5-flash";
+const testModel = "gemini-2.0-flash";
 try {
 const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${testModel}:generateContent?key=${apiKey}`, {
     method: 'POST',
