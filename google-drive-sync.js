@@ -3,8 +3,8 @@
 // ==========================================
 // Utiliza Google Identity Services y GAPI
 
-// ⚠️ IMPORTANTE PARA WEB: Si subes esto a un hosting público, debes cambiar este ID
-// por uno válido creado en Google Cloud Console (API de Drive activada).
+// ⚠️ IMPORTANTE PARA WEB: Si publicas tu app en un hosting (como GitHub Pages o Vercel),
+// DEBES cambiar este ID por el tuyo creado en Google Cloud Console.
 const CLIENT_ID = '155926821940-m8mfuskn410j57sinnqi3dk2saremkdm.apps.googleusercontent.com'; 
 const SCOPES = 'https://www.googleapis.com/auth/drive.file'; 
 const FOLDER_NAME = 'APP Estudio - Datos';
@@ -26,7 +26,7 @@ window.GoogleDriveSync = {
         }
     },
     
-    // 2. Verifica si el usuario ya había iniciado sesión antes
+    // 2. Verifica si el usuario ya tenía una sesión activa
     checkExistingToken() {
         const storedToken = localStorage.getItem('gdrive_token');
         if (storedToken) {
@@ -36,7 +36,7 @@ window.GoogleDriveSync = {
                 if (isValid) {
                     this.isLoggedIn = true;
                     this.updateUI();
-                    this.initAppFolder(); // Conecta y descarga los datos
+                    this.initAppFolder(); // Conecta a la carpeta y descarga datos
                 } else {
                     localStorage.removeItem('gdrive_token');
                 }
@@ -51,16 +51,14 @@ window.GoogleDriveSync = {
         } catch(e) { return false; }
     },
     
-    // 3. Flujo principal de Login al hacer clic en el botón
+    // 3. Flujo principal de Login (Botón del Modal)
     login() {
         if (CLIENT_ID === 'TU_CLIENT_ID_DE_GOOGLE_AQUI') {
             if(typeof showToast === 'function') {
-                showToast('Aviso: Debes configurar un CLIENT_ID real de Google Cloud en el código para funcionar en la nube.', 'error');
-            } else {
-                alert('Aviso: Debes configurar un CLIENT_ID en google-drive-sync.js');
+                showToast('Aviso: Configura tu CLIENT_ID real de Google Cloud en google-drive-sync.js para habilitar la nube.', 'error');
             }
-            // Si quieres permitir pruebas locales ignorando el login real, descomenta la línea de abajo:
-            // return; 
+            // Si quieres permitir pruebas locales ignorando el login real, comenta el return y el showToast.
+            return; 
         }
 
         const client = google.accounts.oauth2.initTokenClient({
@@ -80,7 +78,7 @@ window.GoogleDriveSync = {
                 
                 this.updateUI();
                 if(typeof closeModal === 'function') closeModal('login-modal');
-                if(typeof showToast === 'function') showToast('Iniciando Drive. Preparando tu carpeta...', 'success');
+                if(typeof showToast === 'function') showToast('Conectando a Drive. Preparando tu carpeta...', 'success');
                 
                 this.initAppFolder();
             }
@@ -94,7 +92,7 @@ window.GoogleDriveSync = {
             statusEl.innerHTML = this.isLoggedIn 
                 ? '<i class="fas fa-cloud text-emerald-400"></i> En línea' 
                 : '<i class="fas fa-cloud-upload-alt text-slate-500"></i> Local';
-            statusEl.title = this.isLoggedIn ? "Conectado a Google Drive" : "Usando solo memoria local";
+            statusEl.title = this.isLoggedIn ? "Guardado automático en Drive activado" : "Usando solo memoria local";
         }
     },
     
@@ -111,12 +109,12 @@ window.GoogleDriveSync = {
             });
 
             if (response.result.files && response.result.files.length > 0) {
-                // La carpeta existe, obtenemos su ID y descargamos datos
+                // Existe la carpeta: guardamos su ID y traemos la base de datos
                 this.folderId = response.result.files[0].id;
                 console.log("Carpeta de Drive conectada.");
                 await this.syncAppDataFromDrive();
             } else {
-                // No existe, creamos la carpeta
+                // No existe: creamos la carpeta
                 let createRes = await gapi.client.request({
                     path: 'https://www.googleapis.com/drive/v3/files', 
                     method: 'POST', 
@@ -128,18 +126,18 @@ window.GoogleDriveSync = {
                 this.folderId = createRes.result.id;
                 console.log("Carpeta de Drive creada.");
                 
-                // Si ya teníamos datos locales (appData está definida en app.js), los subimos
+                // Si la app local ya tenía datos (materias/apuntes), hacemos la primera copia de seguridad
                 if(typeof appData !== 'undefined') await this.syncAppDataToDrive(appData);
             }
         } catch(e) { 
             console.error("Fallo al inicializar la carpeta de Drive", e); 
-            if(typeof showToast === 'function') showToast('Problema de red con Drive', 'error');
+            if(typeof showToast === 'function') showToast('Problema de red con Google Drive', 'error');
         } finally {
             if(typeof hideLoading === 'function') hideLoading();
         }
     },
     
-    // 5. Descarga el JSON con tus apuntes desde Drive
+    // 5. Descarga la base de datos (JSON) desde tu Drive y actualiza la App
     async syncAppDataFromDrive() {
         try {
             let response = await gapi.client.request({
@@ -158,20 +156,20 @@ window.GoogleDriveSync = {
                 });
                 
                 if (fileData.body) {
-                    // Actualizamos las variables globales de app.js con lo que vino de Drive
                     const parsedData = JSON.parse(fileData.body);
+                    
+                    // Sobrescribe el objeto global de app.js con lo que había en la nube
                     appData = parsedData; 
                     localStorage.setItem('studio_data_v2', JSON.stringify(appData));
                     
-                    // Renderizamos la interfaz
                     if(typeof renderSubjects === 'function') renderSubjects();
                     
-                    // Si el usuario tenía una nota abierta, actualizamos el texto de pantalla
-                    if (typeof currentState !== 'undefined' && currentState.currentSubject) {
+                    // Si el usuario tenía una nota u hoja en pantalla, actualiza el texto
+                    if (typeof currentState !== 'undefined' && currentState.currentFileId) {
                         const editor = document.getElementById('notes-editor');
-                        if(editor) editor.innerHTML = appData.notes['sub_' + currentState.currentSubject] || '';
+                        if(editor) editor.innerHTML = appData.notes[currentState.currentFileId] || '';
                     }
-                    if(typeof showToast === 'function') showToast('Apuntes actualizados desde Drive', 'success');
+                    if(typeof showToast === 'function') showToast('Apuntes sincronizados desde la nube', 'success');
                 }
             }
         } catch(e) { 
@@ -179,11 +177,10 @@ window.GoogleDriveSync = {
         }
     },
     
-    // 6. Sube tus apuntes (el JSON local) a Drive (Se activa desde app.js cuando dejas de escribir)
+    // 6. Sube tus apuntes locales a Drive (Se ejecuta silenciosamente al dejar de teclear)
     async syncAppDataToDrive(dataObj) {
         if (!this.folderId) return;
         try {
-            // Buscamos si el archivo JSON ya existe para actualizarlo o crearlo nuevo
             let search = await gapi.client.request({
                 path: 'https://www.googleapis.com/drive/v3/files',
                 params: { 
@@ -202,11 +199,11 @@ window.GoogleDriveSync = {
             let method = 'POST';
             
             if (search.result.files && search.result.files.length > 0) {
-                // Actualizar (PATCH)
+                // El archivo JSON ya existe en Drive -> lo actualizamos (PATCH)
                 uploadUrl = `https://www.googleapis.com/upload/drive/v3/files/${search.result.files[0].id}?uploadType=multipart`;
                 method = 'PATCH';
             } else {
-                // Crear (POST) agregando parent ID
+                // El archivo JSON no existe -> lo creamos (POST) dentro de la carpeta
                 metadata.parents = [this.folderId];
                 form.set('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
             }
@@ -216,14 +213,14 @@ window.GoogleDriveSync = {
                 headers: { 'Authorization': 'Bearer ' + this.token }, 
                 body: form 
             });
-            console.log("Copia de seguridad en Drive actualizada correctamente.");
+            console.log("Copia de seguridad del Workspace actualizada en Drive.");
             
         } catch(e) { 
             console.error('Error guardando JSON en Drive', e); 
         }
     },
     
-    // 7. Sube el PDF a la carpeta de Drive y devuelve el ID
+    // 7. Sube el PDF a la carpeta de Drive (Se ejecuta al añadir un archivo)
     async uploadPdfToDrive(fileBlob, fileName) {
         if (!this.folderId) return null;
         try {
@@ -243,14 +240,14 @@ window.GoogleDriveSync = {
             });
             
             const data = await response.json();
-            return data.id; // Retorna el driveId para guardarlo en local
+            return data.id; // Retorna el driveId para guardarlo y no tener que subirlo 2 veces
         } catch(e) { 
             console.error("Error subiendo PDF a Drive", e);
             return null; 
         }
     },
     
-    // 8. Descarga un PDF desde Drive usando su ID (Solo pasa si no está en la caché IndexedDB)
+    // 8. Descarga un PDF desde Drive usando su ID (Pasa la primera vez o si borras caché local)
     async downloadPdfFromDrive(fileId) {
         try {
             const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, { 

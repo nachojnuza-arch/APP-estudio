@@ -5,7 +5,7 @@
 // ==========================================
 let appData = { subjects: [], notes: {} };
 let currentState = {
-    currentFileId: null,
+    currentFileId: null, // Identifica si estamos en una nota general o en un archivo específico
     currentSubject: null,
     expandedSubjects: {},
     expandedAiSubjects: {}, 
@@ -19,10 +19,13 @@ let autoSaveTimer = null;
 let driveSyncTimer = null;
 let screenshotState = { active: false, startX: 0, startY: 0, endX: 0, endY: 0 };
 
+// Variables de estado para la IA (por si interactúan con los otros scripts)
+let aiSourceFileIds = new Set();
+let aiCorrectedNotes = {};
+
 // ==========================================
 // 2. BASE DE DATOS INTERNA (IndexedDB - Caché Rápida)
 // ==========================================
-// Esto evita que tengas que descargar los PDFs de Drive cada vez que abres la app.
 const idb = {
     db: null,
     init() {
@@ -64,12 +67,11 @@ function loadData() {
     if (saved) {
         try { appData = JSON.parse(saved); } catch(e) {}
     } else {
-        appData = { subjects: [{ id: 'sub_' + Date.now(), name: 'Materia de Ejemplo', icon: 'fa-book', files: [] }], notes: {} };
+        appData = { subjects: [], notes: {} };
         saveData(false);
     }
 }
 
-// Sincronización inteligente con debounce para no saturar Drive
 function saveData(syncToDrive = true) {
     localStorage.setItem('studio_data_v2', JSON.stringify(appData));
     
@@ -81,7 +83,7 @@ function saveData(syncToDrive = true) {
         driveSyncTimer = setTimeout(() => {
             window.GoogleDriveSync.syncAppDataToDrive(appData).then(() => {
                 if(saveStatus) {
-                    saveStatus.innerHTML = '<i class="fas fa-cloud-check text-emerald-500"></i> Guardado en Drive';
+                    saveStatus.innerHTML = '<i class="fas fa-cloud-check text-emerald-500"></i> Drive';
                     setTimeout(() => { saveStatus.innerHTML = '<i class="fas fa-check text-green-500"></i> Guardado'; }, 2000);
                 }
             });
@@ -89,10 +91,11 @@ function saveData(syncToDrive = true) {
     }
 }
 
+// CORRECCIÓN: Guardar notas usando el ID del archivo (currentFileId) para que sean independientes
 function saveCurrentNotes() {
     const editor = document.getElementById('notes-editor');
-    if (currentState.currentSubject && editor) { 
-        appData.notes['sub_' + currentState.currentSubject] = editor.innerHTML; 
+    if (currentState.currentFileId && editor) { 
+        appData.notes[currentState.currentFileId] = editor.innerHTML; 
         saveData(); 
     }
 }
@@ -156,19 +159,24 @@ function renderSubjects() {
         const isExpanded = currentState.expandedSubjects[sub.id];
         const li = document.createElement('li');
         li.className = 'flex flex-col';
-        let filesHtml = sub.files.map(f => `
-            <li class="group cursor-pointer rounded-lg flex items-center justify-between p-2 transition-colors ${currentState.currentFileId === f.id ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 text-slate-300'}" onclick="openFile('${sub.id}', '${f.id}')">
-                <div class="flex items-center gap-2 overflow-hidden"><i class="fas ${f.type === 'pdf' ? 'fa-file-pdf text-rose-400' : 'fa-play-circle text-sky-400'} w-5 text-center text-xs"></i><span class="text-xs truncate hide-on-collapse">${f.name}</span>${f.driveId ? '<i class="fas fa-cloud text-blue-400 text-[10px]" title="Drive"></i>' : ''}</div>
+        let filesHtml = sub.files.map(f => {
+            const isActive = currentState.currentFileId === f.id;
+            return `
+            <li class="group cursor-pointer rounded-lg flex items-center justify-between p-2 transition-colors ${isActive ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 text-slate-300'}" onclick="openFile('${sub.id}', '${f.id}')">
+                <div class="flex items-center gap-2 overflow-hidden"><i class="fas ${f.type === 'pdf' ? 'fa-file-pdf text-rose-400' : 'fa-play-circle text-sky-400'} w-5 text-center text-xs flex-shrink-0"></i><span class="text-xs truncate hide-on-collapse">${f.name}</span>${f.driveId ? '<i class="fas fa-cloud text-blue-400 text-[10px]" title="Drive"></i>' : ''}</div>
                 <button onclick="removeFile(event, '${sub.id}', '${f.id}')" class="opacity-0 group-hover:opacity-100 hover:text-red-400 px-1 hide-on-collapse"><i class="fas fa-times text-[10px]"></i></button>
-            </li>`).join('');
+            </li>`
+        }).join('');
+
+        const isGenActive = currentState.currentFileId === ('gen_' + sub.id);
 
         li.innerHTML = `
             <div class="flex items-center justify-between p-2 cursor-pointer hover:bg-slate-800 rounded-lg transition-colors" onclick="toggleSubjectAccordion('${sub.id}')">
-                <div class="flex items-center gap-3"><i class="fas ${sub.icon || 'fa-book'} text-lg center-on-collapse w-6 text-center text-slate-400"></i><span class="text-sm font-medium hide-on-collapse">${sub.name}</span></div>
+                <div class="flex items-center gap-3 overflow-hidden"><i class="fas ${sub.icon || 'fa-book'} text-lg center-on-collapse w-6 text-center text-slate-400 flex-shrink-0"></i><span class="text-sm font-medium hide-on-collapse truncate">${sub.name}</span></div>
                 <i class="fas fa-chevron-${isExpanded ? 'down' : 'right'} text-xs text-slate-500 hide-on-collapse"></i>
             </div>
             <ul class="${isExpanded ? 'block' : 'hidden'} ml-4 pl-2 border-l border-slate-700 mt-1 space-y-1 hide-on-collapse">
-                <li class="group cursor-pointer rounded-lg flex items-center p-2 transition-colors ${currentState.currentFileId === 'gen_' + sub.id ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 text-slate-300'}" onclick="openGeneralNotes('${sub.id}')"><i class="fas fa-pen-nib w-5 text-center text-xs opacity-70"></i><span class="text-xs truncate">Apuntes de Materia</span></li>
+                <li class="group cursor-pointer rounded-lg flex items-center p-2 transition-colors ${isGenActive ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 text-slate-300'}" onclick="openGeneralNotes('${sub.id}')"><i class="fas fa-pen-nib w-5 text-center text-xs opacity-70 flex-shrink-0"></i><span class="text-xs truncate">Apuntes Generales</span></li>
                 ${filesHtml}
             </ul>`;
         list.appendChild(li);
@@ -189,8 +197,15 @@ function addSubject() {
 
 function removeSubject(subId) {
     if(confirm('¿Eliminar materia y todos sus apuntes?')) {
+        const sub = appData.subjects.find(s => s.id === subId);
+        
+        // Limpiar todas las notas asociadas
+        if (sub) {
+            sub.files.forEach(f => delete appData.notes[f.id]);
+        }
+        delete appData.notes['gen_' + subId];
+        
         appData.subjects = appData.subjects.filter(s => s.id !== subId);
-        delete appData.notes['sub_' + subId];
         saveData(); renderManageSubjects(); renderSubjects();
         if(currentState.currentSubject === subId) showEmptyState();
     }
@@ -207,18 +222,22 @@ function openAddFileModal(subId = null) {
     openModal('add-file-modal');
 }
 
+// CORRECCIÓN: Respetar el nombre original del PDF
 async function confirmAddFile() {
     const type = document.getElementById('file-type').value;
-    const name = document.getElementById('file-name').value || 'Documento';
+    const customName = document.getElementById('file-name').value.trim();
     const sub = appData.subjects.find(s => s.id === document.getElementById('file-target-subject').value);
     
-    let fileObj = { id: 'file_' + Date.now(), name, type: type.includes('pdf') ? 'pdf' : 'video', url: '', isLocal: type === 'pdf_local', driveId: null };
+    let fileObj = { id: 'file_' + Date.now(), name: '', type: type.includes('pdf') ? 'pdf' : 'video', url: '', isLocal: type === 'pdf_local', driveId: null };
 
     if (type === 'pdf_local') {
         const file = document.getElementById('file-upload').files[0];
         if (!file) return showToast('Selecciona un PDF', 'error');
         
-        await idb.save(fileObj.id, file); // Guardado ultrarápido
+        // Si no se puso nombre, toma el original y le quita la extensión
+        fileObj.name = customName || file.name.replace(/\.[^/.]+$/, "");
+        
+        await idb.save(fileObj.id, file); 
         
         if (window.GoogleDriveSync && window.GoogleDriveSync.isLoggedIn) {
             showToast('Subiendo respaldo a Drive...', 'info');
@@ -227,6 +246,7 @@ async function confirmAddFile() {
             });
         }
     } else {
+        fileObj.name = customName || 'Documento o Video Web';
         fileObj.url = document.getElementById('file-url').value;
     }
     
@@ -239,17 +259,18 @@ async function confirmAddFile() {
 
 async function removeFile(e, subId, fileId) {
     e.stopPropagation();
-    if(confirm('¿Eliminar archivo?')) {
+    if(confirm('¿Eliminar archivo y sus apuntes asociados?')) {
         await idb.delete(fileId);
         const sub = appData.subjects.find(s => s.id === subId);
         sub.files = sub.files.filter(f => f.id !== fileId);
+        delete appData.notes[fileId]; // Limpiar notas del archivo
         saveData(); renderSubjects();
         if(currentState.currentFileId === fileId) showEmptyState();
     }
 }
 
 // ==========================================
-// 6. VISOR DE PDF Y NAVEGACIÓN DIRECTA
+// 6. VISOR DE PDF, NOTAS Y NAVEGACIÓN
 // ==========================================
 function showEmptyState() {
     document.getElementById('empty-state').classList.remove('hidden');
@@ -257,26 +278,43 @@ function showEmptyState() {
     document.getElementById('video-container').classList.add('hidden');
     document.getElementById('pdf-controls').classList.add('hidden');
     document.getElementById('header-title').textContent = 'Workspace';
+    document.getElementById('notes-editor').innerHTML = '';
     currentState.currentFileId = null;
+    currentState.currentSubject = null;
 }
 
+// CORRECCIÓN: Las notas generales cargan mediante el ID 'gen_IDMATERIA'
 function openGeneralNotes(subId) {
-    saveCurrentNotes();
+    saveCurrentNotes(); 
+    
     const sub = appData.subjects.find(s => s.id === subId);
-    currentState.currentSubject = subId; currentState.currentFileId = 'gen_' + subId;
+    currentState.currentSubject = subId; 
+    currentState.currentFileId = 'gen_' + subId; 
+    
     document.getElementById('header-title').textContent = `Apuntes: ${sub.name}`;
-    document.getElementById('notes-editor').innerHTML = appData.notes['sub_' + subId] || '';
-    showEmptyState(); document.getElementById('empty-state-title').textContent = `Apuntes de ${sub.name}`;
+    document.getElementById('notes-editor').innerHTML = appData.notes[currentState.currentFileId] || '';
+    
+    document.getElementById('empty-state').classList.remove('hidden');
+    document.getElementById('pdf-canvas').classList.add('hidden');
+    document.getElementById('video-container').classList.add('hidden');
+    document.getElementById('pdf-controls').classList.add('hidden');
+    document.getElementById('empty-state-title').textContent = `Apuntes Generales de ${sub.name}`;
+    
     renderSubjects();
 }
 
+// CORRECCIÓN: Los apuntes de PDF cargan usando el ID del archivo
 async function openFile(subId, fileId) {
-    saveCurrentNotes();
+    saveCurrentNotes(); 
+    
     const sub = appData.subjects.find(s => s.id === subId);
     const file = sub.files.find(f => f.id === fileId);
-    currentState.currentSubject = subId; currentState.currentFileId = fileId;
+    
+    currentState.currentSubject = subId; 
+    currentState.currentFileId = fileId; 
+    
     document.getElementById('header-title').textContent = file.name;
-    document.getElementById('notes-editor').innerHTML = appData.notes['sub_' + subId] || '';
+    document.getElementById('notes-editor').innerHTML = appData.notes[fileId] || '';
     renderSubjects();
 
     document.getElementById('empty-state').classList.add('hidden');
@@ -286,15 +324,12 @@ async function openFile(subId, fileId) {
     if (file.type === 'pdf') {
         videoCont.classList.add('hidden');
         
-        // 1. INTENTO DE CARGA LOCAL RÁPIDA (IndexedDB)
         let blob = await idb.get(fileId);
-        
-        // 2. DESCARGA DESDE DRIVE SI NO ESTÁ LOCAL
         if (!blob && file.driveId && window.GoogleDriveSync && window.GoogleDriveSync.isLoggedIn) {
             showLoading('Descargando de Drive...');
             blob = await window.GoogleDriveSync.downloadPdfFromDrive(file.driveId);
             if (blob) { 
-                await idb.save(fileId, blob); // Guardar caché para que sea instantáneo la próxima
+                await idb.save(fileId, blob); 
                 saveData(false); 
             }
             hideLoading();
@@ -338,7 +373,6 @@ function goToPage(num) {
         currentState.pageNum = num; 
         renderPage(); 
     } else {
-        // Volver a poner el número correcto si el usuario escribe un número inválido
         document.getElementById('page-input').value = currentState.pageNum;
     }
 }
@@ -411,25 +445,28 @@ function exportNotesAsDocx() {
     showToast('Documento Word descargado', 'success');
 }
 
+// Las funciones generarResumenDirecto(), summarizeWithAI() y generateQuiz()
+// se encuentran en los archivos ai-original.js y local-summary.js.
+// Aquí solo mantenemos exportaciones y utilidades compartidas.
+
 // ==========================================
 // 9. INICIALIZACIÓN
 // ==========================================
 window.addEventListener('DOMContentLoaded', async () => {
     await idb.init();
     loadData();
+    
+    showEmptyState();
     renderSubjects();
     
-    // Inicializar Drive si el módulo existe y está disponible
     if(window.GoogleDriveSync && typeof window.GoogleDriveSync.init === 'function') {
         window.GoogleDriveSync.init();
     }
     
-    // Inicializar Fuentes de IA si el módulo existe
     if(typeof renderAiSources === 'function') {
         renderAiSources();
     }
 
-    // Auto-guardado al teclear
     document.getElementById('notes-editor').addEventListener('input', () => {
         clearTimeout(autoSaveTimer);
         autoSaveTimer = setTimeout(saveCurrentNotes, 1500);
