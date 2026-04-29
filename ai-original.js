@@ -1694,21 +1694,27 @@ function summarizeWithAI() {
                 contextMsg = `⚠️ Resumen basado solo en tus apuntes (sin resultados en PDFs).`;
             }
 
-            const prompt = `Soy estudiante. Ayúdame a estudiar integrando MIS APUNTES con el contexto extraído del LIBRO.
+            const prompt = `Actúa como un tutor académico experto. Mi objetivo es tener un material de estudio perfecto.
 
-📝 MIS APUNTES:
-${allNotes.length > 1000 ? allNotes.slice(0, 1000) + '...' : allNotes}
+📝 MIS APUNTES ORIGINALES:
+${allNotes.length > 2000 ? allNotes.slice(0, 2000) + '...' : allNotes}
 
-📚 CONTEXTO DEL LIBRO (Fragmentos relevantes):
+📚 CONTEXTO DEL LIBRO (Fragmentos extraídos):
 ${contextForAI}
 
-Genera un RESUMEN EXHAUSTIVO. Tu objetivo es explicar y desarrollar mis apuntes usando la información del libro, manteniendo mis ideas como hilo conductor.
-Formato:
-### 🧠 Conceptos Clave
-• [Concepto]: definición precisa e integrada
-### 📝 Desarrollo Temático
-[Explicación detallada combinando mis ideas con datos concretos del contexto]
-### ❓ 3 Preguntas de Autoevaluación
+TU TAREA:
+1. Analizar mis apuntes y compararlos con el contexto del libro.
+2. CORREGIR cualquier error conceptual, imprecisión o dato erróneo que yo haya escrito.
+3. COMPLETAR mis apuntes agregando la información crucial del libro que me faltó anotar.
+4. Generar el MATERIAL DE ESTUDIO DEFINITIVO, bien estructurado y fácil de leer.
+
+FORMATO DE SALIDA ESTRICTO:
+### 🛠️ Correcciones y Observaciones
+(Menciona brevemente si cometí algún error en mis apuntes y cuál es la versión correcta. Si estaban bien, dilo).
+### 📖 Material de Estudio Extendido
+(Desarrolla el tema de forma completa, clara y estructurada. Usa viñetas, subtítulos y **negritas**. Integra mis apuntes con la información nueva del contexto).
+### 🧠 Glosario Clave
+(3 a 5 definiciones fundamentales que debo recordar).
 
 Respuesta en español:`;
 
