@@ -1371,6 +1371,32 @@ hash = hash & hash;
 return hash.toString(36);
 }
 
+// 🆕 Detección dinámica del mejor modelo disponible según la API Key
+let cachedBestModel = null;
+async function getBestModel(apiKey) {
+    if (cachedBestModel) return cachedBestModel;
+    const keyToUse = apiKey || geminiApiKey;
+    if (!keyToUse) return 'gemini-1.5-flash';
+    
+    try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${keyToUse}`);
+        if (res.ok) {
+            const data = await res.json();
+            const bestModel = data.models.find(m => m.name.includes('gemini-2.5-flash') && m.supportedGenerationMethods?.includes('generateContent')) ||
+                              data.models.find(m => m.name.includes('gemini-2.0-flash') && m.supportedGenerationMethods?.includes('generateContent')) ||
+                              data.models.find(m => m.name.includes('gemini-1.5-flash') && m.supportedGenerationMethods?.includes('generateContent')) ||
+                              data.models.find(m => m.name.includes('gemini') && m.supportedGenerationMethods?.includes('generateContent'));
+                              
+            if (bestModel) {
+                cachedBestModel = bestModel.name.split('/').pop();
+                console.log(`🤖 Modelo dinámico seleccionado: ${cachedBestModel}`);
+                return cachedBestModel;
+            }
+        }
+    } catch(e) { console.warn("⚠️ Fallo la obtención de modelos.", e); }
+    return 'gemini-1.5-flash';
+}
+
 // 🆔 Función de diagnóstico para API key (solo debug, no afecta producción)
 async function diagnoseAPI() {
 const chat = document.getElementById('chat-messages');
@@ -1389,7 +1415,7 @@ html += `<div class="text-green-400">✅ API key: ${masked}</div>`;
 }
 
 // Test directo con modelo fijo (1 sola request)
-    const testModel = "gemini-1.5-flash-8b";
+    const testModel = await getBestModel(apiKey);
 try {
 const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${testModel}:generateContent?key=${apiKey}`, {
     method: 'POST',
@@ -1473,7 +1499,8 @@ throw new Error(`⏱ Rate limit activo. Esperá ${remaining}s más.`);
 return rateLimiter.execute(async () => {
 let lastError;
 
-const fallbackModels = ['gemini-1.5-flash-8b', 'gemini-1.5-flash-latest', 'gemini-1.5-flash'];
+const dynamicModel = await getBestModel(geminiApiKey);
+const fallbackModels = [dynamicModel, 'gemini-1.5-flash-8b', 'gemini-1.5-flash'];
 
 for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
@@ -1592,6 +1619,7 @@ function saveApiKey() {
     if (key) {
         localStorage.setItem('gemini_api_key', key);
         geminiApiKey = key;
+        cachedBestModel = null; // 🆕 Limpiamos caché para forzar redetección si cambió la clave
         closeModal('api-modal');
         if (pendingAIFunction) {
             pendingAIFunction();
