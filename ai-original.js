@@ -1633,7 +1633,7 @@ function formatMarkdownToHtml(text) {
         .replace(/\n/gim, '<br>');
 }
 
-// 🆕 summarizeWithAI con extracción de páginas relevantes
+// 🆕 summarizeWithAI con extracción guiada por RAG unificada
 function summarizeWithAI() {
     requireApiKey(async () => {
         const chat = document.getElementById('chat-messages');
@@ -1655,84 +1655,61 @@ function summarizeWithAI() {
         }
 
         // Mostrar mensaje del usuario
-        chat.innerHTML += `<div class="msg-user p-3 shadow-sm text-sm self-end max-w-[85%] rounded-l-xl rounded-tr-xl bg-indigo-600 text-white">Resumí mis apuntes con el contenido relevante de mis PDFs.</div>`;
+        chat.innerHTML += `<div class="msg-user p-3 shadow-sm text-sm self-end max-w-[85%] rounded-l-xl rounded-tr-xl bg-indigo-600 text-white">Resumí mis apuntes integrando mis PDFs seleccionados.</div>`;
         if (typing) typing.classList.remove('hidden');
         chat.scrollTop = chat.scrollHeight;
 
         try {
-            // PASO 1: Extraer las 2 páginas más relevantes (reducido de 4 a 2 para ahorrar tokens)
-            showToast('🔍 Buscando páginas relevantes en tus PDFs...');
+            showToast('🔍 Extrayendo información de tus PDFs guiada por tus apuntes...');
             
-            let relevantPages = null;
-            try {
-                relevantPages = await extraerPaginasRelevantes(allNotes, 2);  // REDUCIDO: solo 2 páginas
-            } catch (e) {
-                console.warn('⚠️ Error extrayendo páginas:', e.message);
-            }
+            // Usamos tu función de RAG: extrae fragmentos precisos basados en tus apuntes
+            const filteredContext = await extractGuidedSources(allNotes, {
+                maxChunks: 20, 
+                maxTokens: 2500, 
+                minRelevanceScore: 0.15 
+            });
 
-            // PASO 2: Construir el prompt con las páginas relevantes + apuntes
             let contextForAI = '';
-            let contextSummary = '';
-            
-            if (relevantPages && !relevantPages.error && relevantPages.text) {
-                console.log(`✅ ${relevantPages.pagesExtracted} páginas relevantes encontradas`);
-                
-                // 🆕 Resumir el contexto para ahorrar tokens (máximo ~1500 tokens)
-                const maxContextLength = 5000;  // ~1250 tokens
-                contextForAI = relevantPages.text;
-                if (contextForAI.length > maxContextLength) {
-                    // Tomar los primeros párrafos más relevantes de cada página
-                    const pageBlocks = contextForAI.split(/═{20,}/).filter(b => b.trim());
-                    contextForAI = '';
-                    for (const block of pageBlocks.slice(0, 2)) {  // Solo primeras 2 páginas
-                        contextForAI += block + '\n\n';
-                    }
-                    contextForAI = contextForAI.slice(0, maxContextLength);
-                }
-                contextSummary = `${relevantPages.pagesExtracted} páginas (${relevantPages.totalPages} analizadas)`;
-                showToast(`📄 2 páginas encontradas. Generando resumen...`);
+            let contextMsg = '';
+
+            if (filteredContext) {
+                contextForAI = filteredContext;
+                contextMsg = `✅ Se extrajeron fragmentos relevantes de tus PDFs para complementar.`;
+                console.log("Contexto extraído para IA:", contextForAI);
             } else {
-                console.warn('⚠️ No se encontraron páginas relevantes, usando solo apuntes');
-                contextForAI = '(No se encontraron páginas relevantes en los PDFs. Basate en mis apuntes.)';
-                contextSummary = 'Sin contexto de PDFs';
+                contextForAI = '(No se encontraron fragmentos relevantes en los PDFs seleccionados. Basa el resumen exclusivamente en los apuntes proporcionados).';
+                contextMsg = `⚠️ Resumen basado solo en tus apuntes (sin resultados en PDFs).`;
             }
 
-            // Construir prompt optimizado (máximo ~2000 tokens total)
-            const maxNotesLength = 800;  // ~200 tokens para apuntes
-            const notesSummary = allNotes.length > maxNotesLength ? allNotes.slice(0, maxNotesLength) + ' [...]' : allNotes;
+            const prompt = `Soy estudiante. Ayúdame a estudiar integrando MIS APUNTES con el contexto extraído del LIBRO.
 
-            const prompt = `Soy estudiante de medicina. Ayudame a estudiar con mis apuntes y el libro.
+📝 MIS APUNTES:
+${allNotes.length > 1000 ? allNotes.slice(0, 1000) + '...' : allNotes}
 
-MIS APUNTES:
-${notesSummary}
-
-LIBRO (páginas relevantes):
+📚 CONTEXTO DEL LIBRO (Fragmentos relevantes):
 ${contextForAI}
 
-Generá un RESUMEN claro basado en mis apuntes, complementado con el libro.
-
+Genera un RESUMEN EXHAUSTIVO. Tu objetivo es explicar y desarrollar mis apuntes usando la información del libro, manteniendo mis ideas como hilo conductor.
 Formato:
 ### 🧠 Conceptos Clave
-• [Concepto]: definición
-### 📝 Explicación
-[Desarrollo]
-### 📖 Detalles Importantes
-[Puntos clave para el examen]
+• [Concepto]: definición precisa e integrada
+### 📝 Desarrollo Temático
+[Explicación detallada combinando mis ideas con datos concretos del contexto]
 ### ❓ 3 Preguntas de Autoevaluación
 
-Usá mis apuntes como guía. Del libro, solo complementá. Escribí en español. Respuesta:`;
+Respuesta en español:`;
 
             console.log(`📏 Prompt size: ~${Math.ceil(prompt.length / 4)} tokens`);
 
             // 🤖 LLAMAR A IA
             const result = await callAI(prompt, { task: 'summary', useCache: false });
 
-            // Mostrar respuesta en pantalla completa como los resúmenes sin IA
-            const htmlContent = buildAISummaryHTML(result, notesSummary, relevantPages);
+            // Mostrar respuesta en pantalla completa
+            const htmlContent = buildAISummaryHTML(result, allNotes, filteredContext ? { text: filteredContext, pagesExtracted: 'Varios fragmentos' } : null);
             openAIFullscreen(htmlContent, '🤖 Resumen generado por IA');
 
-            // También mostrar en el chat un mensaje breve
-            chat.innerHTML += `<div class="msg-ai p-4 shadow-sm text-sm self-start max-w-[95%] rounded-r-xl rounded-tl-xl leading-relaxed bg-indigo-50 border border-indigo-200">✅ <strong>Resumen con IA generado.</strong> Abrí pantalla completa para estudiar.${contextSummary ? `<br><small class="text-slate-500">📄 Contexto: ${contextSummary}</small>` : ''}</div>`;
+            // Mostrar en el chat
+            chat.innerHTML += `<div class="msg-ai p-4 shadow-sm text-sm self-start max-w-[95%] rounded-r-xl rounded-tl-xl leading-relaxed bg-indigo-50 border border-indigo-200">✅ <strong>Resumen con IA generado.</strong> Abrí pantalla completa para estudiar.<br><small class="text-slate-500">${contextMsg}</small></div>`;
             showToast('✅ Resumen con IA generado', 'success');
 
         } catch (e) {
@@ -1849,7 +1826,6 @@ async function extraerParrafosComoResumen(pdfSource = null) {
         try {
             let blob;
             if (file.driveId) {
-                // CORRECCIÓN: Usando window.GoogleDriveSync.downloadPdfFromDrive
                 blob = await window.GoogleDriveSync.downloadPdfFromDrive(file.driveId);
             } else {
                 blob = await idb.get(fileId);
@@ -2139,8 +2115,27 @@ async function generarResumenDirecto() {
 
             let combinedText = '';
             for (const fileId of fileIds) {
+                // Primero buscamos el objeto del archivo completo para saber si es local o Drive
+                let file = null;
+                for (const sub of appData.subjects) {
+                    const found = sub.files.find(f => f.id === fileId);
+                    if (found) { file = found; break; }
+                }
+                
+                if (!file || file.type !== 'pdf') continue;
+
                 try {
-                    const blob = await window.GoogleDriveSync.getFile(fileId);
+                    let blob;
+                    if (file.driveId) {
+                        // Extracción correcta usando downloadPdfFromDrive
+                        blob = await window.GoogleDriveSync.downloadPdfFromDrive(file.driveId);
+                    } else {
+                        // Descarga correcta si el archivo es local en IndexedDB
+                        blob = await idb.get(fileId);
+                    }
+                    
+                    if (!blob) continue;
+
                     const arrayBuffer = await blob.arrayBuffer();
                     const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
                     const doc = await loadingTask.promise;
@@ -2153,12 +2148,12 @@ async function generarResumenDirecto() {
                         combinedText += pageText + ' \n\n ';
                     }
                 } catch (err) {
-                    console.warn('No se pudo extraer texto de', fileId, err);
+                    console.warn('No se pudo extraer texto de', file.name, err);
                 }
             }
 
             if (combinedText.trim().length < 50) {
-                chat.innerHTML += `<div class="msg-ai p-4 shadow-sm text-sm self-start max-w-[95%] rounded-r-xl rounded-tl-xl bg-amber-50 border border-amber-200 text-amber-700">⚠️ No se pudo extraer texto de los PDFs.</div>`;
+                chat.innerHTML += `<div class="msg-ai p-4 shadow-sm text-sm self-start max-w-[95%] rounded-r-xl rounded-tl-xl bg-amber-50 border border-amber-200 text-amber-700">⚠️ No se pudo extraer texto de los PDFs. Asegúrate de tener conexión.</div>`;
                 if (typing) typing.classList.add('hidden');
                 chat.scrollTop = chat.scrollHeight;
                 return;
