@@ -437,20 +437,22 @@ async function extractGuidedSources(notesText, options = {}) {
         try {
             let fullText = '';
 
-            if (file.driveId) {
+            let blob = await idb.get(fileId);
+            if (!blob && file.driveId && window.GoogleDriveSync && window.GoogleDriveSync.isLoggedIn) {
                 console.log(`☁️ Descargando ${file.name} desde Google Drive para la IA...`);
-                // CORRECCIÓN: Llamando a GoogleDriveSync correctamente
-                const blob = await window.GoogleDriveSync.downloadPdfFromDrive(file.driveId);
-                if (!blob) continue;
-                fullText = await extractTextFromBlob(blob);
-            } else if (file.isLocal) {
-                const blob = await idb.get(fileId);
-                if (!blob) continue;
-                fullText = await extractTextFromBlob(blob);
-            } else {
-                console.log(`⚠ URLs externas no se pueden extraer sin backend: ${file.url}`);
+                blob = await window.GoogleDriveSync.downloadPdfFromDrive(file.driveId);
+            }
+            
+            if (!blob) {
+                if (!file.isLocal && !file.driveId) {
+                    console.log(`⚠ URLs externas no se pueden extraer sin backend: ${file.url}`);
+                } else {
+                    console.log(`⚠ No se pudo obtener el archivo ${file.name}`);
+                }
                 continue;
             }
+            
+            fullText = await extractTextFromBlob(blob);
 
             if (!fullText || fullText.trim().length < 50) continue;
 
@@ -783,12 +785,9 @@ async function extraerPaginasRelevantes(userNotes, maxPaginas = 4) {
         if (!file.isLocal && !file.driveId) continue;
 
         try {
-            let blob;
-            if (file.driveId) {
-                // CORRECCIÓN: Llamando a GoogleDriveSync correctamente
+            let blob = await idb.get(fileId);
+            if (!blob && file.driveId && window.GoogleDriveSync && window.GoogleDriveSync.isLoggedIn) {
                 blob = await window.GoogleDriveSync.downloadPdfFromDrive(file.driveId);
-            } else {
-                blob = await idb.get(fileId);
             }
             if (!blob) continue;
 
@@ -1824,11 +1823,9 @@ async function extraerParrafosComoResumen(pdfSource = null) {
         }
 
         try {
-            let blob;
-            if (file.driveId) {
+            let blob = await idb.get(fileId);
+            if (!blob && file.driveId && window.GoogleDriveSync && window.GoogleDriveSync.isLoggedIn) {
                 blob = await window.GoogleDriveSync.downloadPdfFromDrive(file.driveId);
-            } else {
-                blob = await idb.get(fileId);
             }
             
             if (!blob) {
@@ -2125,27 +2122,16 @@ async function generarResumenDirecto() {
                 if (!file || file.type !== 'pdf') continue;
 
                 try {
-                    let blob;
-                    if (file.driveId) {
-                        // Extracción correcta usando downloadPdfFromDrive
+                    let blob = await idb.get(fileId);
+                    if (!blob && file.driveId && window.GoogleDriveSync && window.GoogleDriveSync.isLoggedIn) {
                         blob = await window.GoogleDriveSync.downloadPdfFromDrive(file.driveId);
-                    } else {
-                        // Descarga correcta si el archivo es local en IndexedDB
-                        blob = await idb.get(fileId);
                     }
                     
                     if (!blob) continue;
 
-                    const arrayBuffer = await blob.arrayBuffer();
-                    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-                    const doc = await loadingTask.promise;
-                    
-                    const maxPages = Math.min(30, doc.numPages); // Extraer hasta 30 páginas para no saturar memoria
-                    for (let i = 1; i <= maxPages; i++) {
-                        const page = await doc.getPage(i);
-                        const textContent = await page.getTextContent();
-                        const pageText = textContent.items.map(item => item.str).join(' ');
-                        combinedText += pageText + ' \n\n ';
+                    const text = await extractTextFromBlob(blob);
+                    if (text) {
+                        combinedText += text + '\n\n';
                     }
                 } catch (err) {
                     console.warn('No se pudo extraer texto de', file.name, err);
