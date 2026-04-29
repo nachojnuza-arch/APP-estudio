@@ -32,11 +32,9 @@
         input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         input[type=number] { -moz-appearance: textfield; }
         
-        /* Ajustes para cuando la sidebar se colapsa */
-        .sidebar { transition: width 0.3s ease; }
-        .collapsed .hide-on-collapse { display: none !important; }
-        .collapsed .center-on-collapse { justify-content: center !important; }
-        .collapsed .center-on-collapse span { display: none; }
+        /* Ajustes de la sidebar: ahora desaparece completamente al cerrarse (ancho 0) */
+        .sidebar { transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); width: 16rem; } /* w-64 = 16rem */
+        .sidebar.collapsed { width: 0 !important; border: none !important; opacity: 0; pointer-events: none; }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden bg-white text-slate-800">
@@ -44,36 +42,36 @@
     <!-- Notificaciones Toast -->
     <div id="toast-container" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-[100] flex flex-col gap-2 pointer-events-none"></div>
 
-    <!-- BARRA LATERAL (CORREGIDA: overflow-x-hidden añadido para evitar franjas azules) -->
-    <aside id="sidebar" class="sidebar w-64 bg-slate-900 text-white flex flex-col flex-shrink-0 z-40 relative overflow-x-hidden h-full">
+    <!-- BARRA LATERAL (CORREGIDA para no dejar franja azul) -->
+    <aside id="sidebar" class="sidebar bg-slate-900 text-white flex flex-col flex-shrink-0 z-40 relative overflow-x-hidden h-full">
         <div class="h-14 flex items-center justify-between px-4 border-b border-slate-800 flex-shrink-0">
-            <div class="font-bold tracking-wider text-sm hide-on-collapse flex items-center gap-2">
+            <div class="font-bold tracking-wider text-sm flex items-center gap-2 whitespace-nowrap">
                 <i class="fas fa-graduation-cap text-indigo-400 text-lg"></i> STUDIO
             </div>
-            <button type="button" onclick="toggleSidebar()" title="Alternar barra lateral" class="text-slate-400 hover:text-white transition-colors center-on-collapse w-full flex justify-end">
-                <i class="fas fa-bars"></i>
+            <button type="button" onclick="toggleSidebar()" title="Cerrar barra lateral" class="text-slate-400 hover:text-white transition-colors">
+                <i class="fas fa-times"></i>
             </button>
         </div>
 
         <div class="flex-grow overflow-y-auto overflow-x-hidden p-3">
-            <div class="flex items-center justify-between mb-2 px-2 hide-on-collapse">
+            <div class="flex items-center justify-between mb-2 px-2 whitespace-nowrap">
                 <div class="text-[10px] uppercase font-bold text-slate-500">Tus Materias</div>
                 <!-- Indicador de estado de Drive -->
                 <div id="drive-sync-status" class="text-[10px] text-slate-500 cursor-pointer hover:text-white transition-colors" onclick="openModal('login-modal')" title="Sincronización con Drive">
                     <i class="fas fa-cloud-upload-alt"></i> Local
                 </div>
             </div>
-            <ul id="subject-list" class="space-y-1 w-full">
+            <ul id="subject-list" class="space-y-1 w-full min-w-[14rem]">
                 <!-- Lista de materias y archivos se generará aquí -->
             </ul>
         </div>
 
-        <div class="p-3 border-t border-slate-800 flex-shrink-0 space-y-2">
-            <button onclick="openAddFileModal()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg py-2 text-sm font-medium transition-colors flex items-center center-on-collapse justify-center gap-2 shadow-sm">
-                <i class="fas fa-plus w-5 text-center"></i> <span class="hide-on-collapse">Nuevo Recurso</span>
+        <div class="p-3 border-t border-slate-800 flex-shrink-0 space-y-2 whitespace-nowrap">
+            <button onclick="openAddFileModal()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2 shadow-sm">
+                <i class="fas fa-plus"></i> <span>Nuevo Recurso</span>
             </button>
-            <button onclick="openModal('manage-subjects-modal')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg py-2 text-sm font-medium transition-colors flex items-center center-on-collapse justify-center gap-2 shadow-sm">
-                <i class="fas fa-cog w-5 text-center"></i> <span class="hide-on-collapse">Ajustes</span>
+            <button onclick="openModal('manage-subjects-modal')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2 shadow-sm">
+                <i class="fas fa-cog"></i> <span>Ajustes</span>
             </button>
         </div>
     </aside>
@@ -84,6 +82,11 @@
         <!-- Topbar -->
         <header class="h-14 border-b border-slate-200 px-4 flex items-center justify-between bg-white z-30 shadow-sm flex-shrink-0 w-full">
             <div class="flex items-center gap-3 truncate">
+                <!-- NUEVO: Botón para abrir la sidebar si está cerrada -->
+                <button onclick="toggleSidebar()" class="text-slate-500 hover:text-indigo-600 transition-colors p-1" title="Abrir Menú">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="w-px h-6 bg-slate-200 mx-1"></div>
                 <i id="header-icon" class="fas fa-book-open text-slate-400"></i>
                 <h1 id="header-title" class="font-semibold text-slate-700 truncate text-sm">Bienvenido</h1>
             </div>
@@ -160,7 +163,7 @@
                         </div>
                         <div class="flex items-center gap-3">
                             <span id="save-status" class="text-xs text-slate-400"><i class="fas fa-check text-green-500"></i> Guardado</span>
-                            <button type="button" title="Exportar notas como documento Word" onclick="exportNotesAsDocx()" class="text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded transition-colors flex items-center gap-1">
+                            <button type="button" title="Exportar notas" onclick="exportNotesAsDocx()" class="text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded transition-colors flex items-center gap-1">
                                 <i class="fas fa-file-word"></i> Exportar
                             </button>
                         </div>
@@ -187,6 +190,18 @@
                             <i class="fas fa-question-circle"></i> Quiz IA
                         </button>
                     </div>
+                    
+                    <!-- RESTAURADO: Sector de Fuentes IA -->
+                    <div class="px-4 py-2 border-b border-slate-200 bg-slate-50 flex-shrink-0">
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase">📚 Fuentes IA</label>
+                            <span id="ai-source-count" class="text-[10px] text-indigo-500 font-medium">0 seleccionadas</span>
+                        </div>
+                        <div id="ai-sources-list" class="max-h-28 overflow-y-auto space-y-0.5">
+                            <p class="text-xs text-slate-400 italic p-1">Cargando fuentes...</p>
+                        </div>
+                    </div>
+
                     <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
                         <div class="msg-ai p-3 text-sm shadow-sm bg-white border border-slate-200 rounded-xl rounded-tl-none">
                             ¡Hola! Soy tu asistente de estudio. Selecciona una acción rápida arriba para resumir tus notas actuales.
