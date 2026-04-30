@@ -43,7 +43,7 @@
     <div id="toast-container" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-[100] flex flex-col gap-2 pointer-events-none"></div>
 
     <!-- BARRA LATERAL (CORREGIDA para no dejar franja azul) -->
-    <aside id="sidebar" class="sidebar bg-slate-900 text-white flex flex-col flex-shrink-0 z-50 absolute md:relative overflow-x-hidden h-full shadow-2xl md:shadow-none">
+    <aside id="sidebar" class="sidebar bg-slate-900 text-white flex flex-col flex-shrink-0 z-50 absolute md:relative left-0 top-0 bottom-0 overflow-x-hidden h-full shadow-2xl md:shadow-none">
         <div class="h-14 flex items-center justify-between px-4 border-b border-slate-800 flex-shrink-0">
             <div class="font-bold tracking-wider text-sm flex items-center gap-2 whitespace-nowrap">
                 <i class="fas fa-graduation-cap text-indigo-400 text-lg"></i> STUDIO
@@ -110,7 +110,7 @@
         <div class="flex-1 flex overflow-hidden relative">
 
             <!-- Visor Izquierdo (Media) -->
-            <div id="media-viewer" class="flex-1 bg-slate-100 relative overflow-y-auto flex justify-center items-start panel-transition h-full w-full">
+            <div id="media-viewer" class="flex-1 bg-slate-100 relative overflow-auto flex justify-center items-start panel-transition h-full w-full">
 
                 <!-- Estado Vacío -->
                 <div id="empty-state" class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 z-10 m-auto h-full w-full pointer-events-none">
@@ -122,7 +122,7 @@
                 </div>
 
                 <!-- Contenedores multimedia -->
-                <canvas id="pdf-canvas" class="hidden my-6 shadow-xl border border-slate-200 rounded relative z-20 max-w-full"></canvas>
+                <canvas id="pdf-canvas" class="hidden my-6 shadow-xl border border-slate-200 rounded relative z-20"></canvas>
                 <div id="video-container" class="hidden w-full h-full bg-black relative z-20"></div>
 
                 <!-- Controles PDF Flotantes -->

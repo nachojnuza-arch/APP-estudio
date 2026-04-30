@@ -105,10 +105,22 @@ function saveCurrentNotes() {
 // ==========================================
 function toggleSidebar() { 
     document.getElementById('sidebar').classList.toggle('collapsed'); 
-    document.getElementById('sidebar').classList.toggle('w-16'); 
     setTimeout(() => { if (currentState.pdfDoc) renderPage(); }, 300); // Re-renderiza al terminar animación
 }
-function toggleNotesPanel() { document.getElementById('notes-panel').classList.toggle('hidden'); document.getElementById('notes-panel').classList.toggle('flex'); }
+
+function toggleNotesPanel() { 
+    const panel = document.getElementById('notes-panel');
+    if (panel.classList.contains('hidden') || panel.style.display === 'none') {
+        panel.classList.remove('hidden');
+        panel.classList.remove('md:flex');
+        panel.style.display = 'flex';
+    } else {
+        panel.classList.add('hidden');
+        panel.classList.remove('md:flex');
+        panel.style.display = 'none';
+    }
+    setTimeout(() => { if (currentState.pdfDoc) renderPage(); }, 300);
+}
 function openModal(id) { document.getElementById(id).classList.remove('hidden'); if(id==='manage-subjects-modal') renderManageSubjects(); }
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 function showLoading(msg) { document.getElementById('loading').classList.remove('hidden'); document.getElementById('loading-msg').textContent = msg; }
@@ -367,6 +379,7 @@ function openGeneralNotes(subId) {
     document.getElementById('pdf-controls').classList.add('hidden');
     document.getElementById('empty-state-title').textContent = `Apuntes Generales de ${sub.name}`;
     
+    if (window.innerWidth < 768) document.getElementById('sidebar').classList.add('collapsed');
     renderSubjects();
 }
 
@@ -382,6 +395,8 @@ async function openFile(subId, fileId) {
     
     document.getElementById('header-title').textContent = file.name;
     document.getElementById('notes-editor').innerHTML = appData.notes[fileId] || '';
+    
+    if (window.innerWidth < 768) document.getElementById('sidebar').classList.add('collapsed');
     renderSubjects();
 
     document.getElementById('empty-state').classList.add('hidden');
