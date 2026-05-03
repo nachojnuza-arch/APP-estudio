@@ -1694,7 +1694,7 @@ function summarizeWithAI() {
                 contextMsg = `⚠️ Resumen basado solo en tus apuntes (sin resultados en PDFs).`;
             }
 
-            const prompt = \`Actúa como un profesor universitario experto. Tu tarea es evaluar mis apuntes, corregirlos y crear una GUÍA DE ESTUDIO COMPLETA Y COHESIONADA.
+            const prompt = `Actúa como un profesor universitario experto. Tu tarea es evaluar mis apuntes, corregirlos y crear una GUÍA DE ESTUDIO COMPLETA Y COHESIONADA.
 
 INSTRUCCIONES CRÍTICAS:
 1. CORRECCIÓN Y ANÁLISIS: Revisa mis apuntes originales. Identifica cualquier error, omisión o imprecisión y corrígelo explícitamente en una sección de "Correcciones a los apuntes".

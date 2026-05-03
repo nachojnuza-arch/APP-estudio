@@ -65,7 +65,13 @@ const idb = {
 function loadData() {
     const saved = localStorage.getItem('studio_data_v2'); 
     if (saved) {
-        try { appData = JSON.parse(saved); } catch(e) {}
+        try { 
+            appData = JSON.parse(saved); 
+            if (!appData.subjects) appData.subjects = [];
+            appData.subjects.forEach(sub => {
+                if (!sub.files) sub.files = [];
+            });
+        } catch(e) {}
     } else {
         appData = { subjects: [], notes: {} };
         saveData(false);
@@ -100,29 +106,53 @@ function saveCurrentNotes() {
     }
 }
 
+function execCmd(command) {
+    document.execCommand(command, false, null);
+    const editor = document.getElementById('notes-editor');
+    if (editor) editor.focus();
+}
+
 // ==========================================
 // 4. INTERFAZ Y UTILIDADES
 // ==========================================
 function toggleSidebar() { 
-    document.getElementById('sidebar').classList.toggle('collapsed'); 
-    setTimeout(() => { if (currentState.pdfDoc) renderPage(); }, 300); // Re-renderiza al terminar animación
-}
-
-function toggleNotesPanel() { 
-    const panel = document.getElementById('notes-panel');
-    if (panel.classList.contains('hidden') || panel.style.display === 'none') {
-        panel.classList.remove('hidden');
-        panel.classList.remove('md:flex');
-        panel.style.display = 'flex';
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    
+    if (window.innerWidth < 768) {
+        sidebar.classList.toggle('-translate-x-full');
+        if (overlay) overlay.classList.toggle('hidden');
     } else {
-        panel.classList.add('hidden');
-        panel.classList.remove('md:flex');
-        panel.style.display = 'none';
+        sidebar.classList.toggle('md:hidden');
     }
     setTimeout(() => { if (currentState.pdfDoc) renderPage(); }, 300);
 }
-function openModal(id) { document.getElementById(id).classList.remove('hidden'); if(id==='manage-subjects-modal') renderManageSubjects(); }
-function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+function toggleNotesPanel() { 
+    const panel = document.getElementById('view-notes');
+    if (!panel) return;
+    
+    if (panel.classList.contains('md:flex')) {
+        // Actualmente visible en PC, lo ocultamos
+        panel.classList.remove('md:flex');
+        panel.classList.add('md:hidden');
+    } else {
+        // Actualmente oculto en PC, lo mostramos
+        panel.classList.remove('md:hidden');
+        panel.classList.add('md:flex');
+    }
+    setTimeout(() => { if (currentState.pdfDoc) renderPage(); }, 300);
+}
+function openModal(id) { 
+    document.getElementById('modal-overlay').classList.remove('hidden');
+    document.querySelectorAll('#modal-overlay .modal-container').forEach(m => m.classList.add('hidden'));
+    document.getElementById(id).classList.remove('hidden'); 
+    if(id==='manage-subjects-modal') renderManageSubjects(); 
+}
+function closeModal(id) { 
+    document.getElementById(id).classList.add('hidden'); 
+    document.getElementById('modal-overlay').classList.add('hidden');
+}
 function showLoading(msg) { document.getElementById('loading').classList.remove('hidden'); document.getElementById('loading-msg').textContent = msg; }
 function hideLoading() { document.getElementById('loading').classList.add('hidden'); }
 
@@ -183,7 +213,7 @@ function renderSubjects() {
             return `
             <li class="group cursor-pointer rounded-lg flex items-center justify-between p-2 transition-colors ${isActive ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 text-slate-300'}" onclick="openFile('${sub.id}', '${f.id}')">
                 <div class="flex items-center gap-2 overflow-hidden"><i class="fas ${f.type === 'pdf' ? 'fa-file-pdf text-rose-400' : 'fa-play-circle text-sky-400'} w-5 text-center text-xs flex-shrink-0"></i><span class="text-xs truncate hide-on-collapse">${f.name}</span>${f.driveId ? '<i class="fas fa-cloud text-blue-400 text-[10px]" title="Drive"></i>' : ''}</div>
-                <button onclick="removeFile(event, '${sub.id}', '${f.id}')" class="opacity-0 group-hover:opacity-100 hover:text-red-400 px-1 hide-on-collapse"><i class="fas fa-times text-[10px]"></i></button>
+                <button type="button" title="Eliminar archivo" onclick="removeFile(event, '${sub.id}', '${f.id}')" class="opacity-0 group-hover:opacity-100 hover:text-red-400 px-1 hide-on-collapse"><i class="fas fa-times text-[10px]"></i></button>
             </li>`
         }).join('');
 
@@ -237,7 +267,7 @@ function removeSubject(subId) {
 
 function renderManageSubjects() {
     const list = document.getElementById('modal-subject-list');
-    list.innerHTML = appData.subjects.map(sub => `<li class="flex items-center justify-between p-3 hover:bg-slate-50"><span class="text-sm">${sub.name}</span><button onclick="removeSubject('${sub.id}')" class="text-red-400"><i class="fas fa-trash-alt"></i></button></li>`).join('');
+    list.innerHTML = appData.subjects.map(sub => `<li class="flex items-center justify-between p-3 hover:bg-slate-50"><span class="text-sm">${sub.name}</span><button type="button" title="Eliminar materia" onclick="removeSubject('${sub.id}')" class="text-red-400"><i class="fas fa-trash-alt"></i></button></li>`).join('');
 }
 
 function openAddFileModal(subId = null) {
@@ -322,7 +352,7 @@ function renderAiSources() {
             const fileItem = document.createElement('label');
             fileItem.className = 'flex items-center gap-2 px-2 py-1 hover:bg-slate-200 rounded cursor-pointer transition-colors';
             fileItem.innerHTML = `
-                <input type="checkbox" class="w-3 h-3 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" 
+                <input type="checkbox" title="Usar ${f.name} en IA" aria-label="Usar ${f.name} en IA" class="w-3 h-3 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" 
                        ${isChecked ? 'checked' : ''} onchange="toggleAiSource('${f.id}')">
                 <i class="fas fa-file-pdf text-rose-400 text-xs"></i>
                 <span class="text-xs text-slate-600 truncate flex-1">${f.name}</span>
@@ -356,6 +386,7 @@ function showEmptyState() {
     document.getElementById('pdf-canvas').classList.add('hidden');
     document.getElementById('video-container').classList.add('hidden');
     document.getElementById('pdf-controls').classList.add('hidden');
+    document.getElementById('subject-dashboard')?.classList.add('hidden');
     document.getElementById('header-title').textContent = 'Workspace';
     document.getElementById('notes-editor').innerHTML = '';
     currentState.currentFileId = null;
@@ -373,13 +404,36 @@ function openGeneralNotes(subId) {
     document.getElementById('header-title').textContent = `Apuntes: ${sub.name}`;
     document.getElementById('notes-editor').innerHTML = appData.notes[currentState.currentFileId] || '';
     
-    document.getElementById('empty-state').classList.remove('hidden');
+    document.getElementById('empty-state').classList.add('hidden');
     document.getElementById('pdf-canvas').classList.add('hidden');
     document.getElementById('video-container').classList.add('hidden');
     document.getElementById('pdf-controls').classList.add('hidden');
-    document.getElementById('empty-state-title').textContent = `Apuntes Generales de ${sub.name}`;
     
-    if (window.innerWidth < 768) document.getElementById('sidebar').classList.add('collapsed');
+    const dashboard = document.getElementById('subject-dashboard');
+    if (dashboard) {
+        dashboard.classList.remove('hidden');
+        let html = `<div class="max-w-5xl mx-auto">`;
+        html += `<h2 class="text-2xl md:text-3xl font-bold text-slate-800 mb-2">Recursos de ${sub.name}</h2>`;
+        html += `<p class="text-slate-500 mb-8">Selecciona un documento para abrirlo o usa el editor de la derecha para notas generales.</p>`;
+        html += `<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">`;
+        
+        if (sub.files.length === 0) {
+            html += `<div class="col-span-full text-center py-16 bg-white rounded-2xl border border-dashed border-slate-300"><i class="fas fa-folder-open text-4xl text-slate-300 mb-3"></i><p class="text-slate-500 font-medium">No hay archivos en esta materia</p><button onclick="openAddFileModal('${sub.id}')" class="mt-4 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-bold hover:bg-indigo-100 transition-colors">Añadir recurso</button></div>`;
+        } else {
+            sub.files.forEach(f => {
+                const icon = f.type === 'pdf' ? 'fa-file-pdf text-rose-500' : 'fa-play-circle text-sky-500';
+                const bgIcon = f.type === 'pdf' ? 'bg-rose-50' : 'bg-sky-50';
+                html += `<div onclick="openFile('${sub.id}', '${f.id}')" class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:shadow-lg hover:-translate-y-1 hover:border-indigo-300 cursor-pointer transition-all duration-300 flex flex-col items-center text-center group"><div class="w-16 h-16 rounded-full ${bgIcon} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300"><i class="fas ${icon} text-3xl"></i></div><span class="text-sm font-bold text-slate-700 line-clamp-3 leading-snug">${f.name}</span></div>`;
+            });
+        }
+        html += `</div></div>`;
+        dashboard.innerHTML = html;
+    }
+    
+    if (window.innerWidth < 768) {
+        document.getElementById('sidebar').classList.add('-translate-x-full');
+        document.getElementById('sidebar-overlay')?.classList.add('hidden');
+    }
     renderSubjects();
 }
 
@@ -396,10 +450,19 @@ async function openFile(subId, fileId) {
     document.getElementById('header-title').textContent = file.name;
     document.getElementById('notes-editor').innerHTML = appData.notes[fileId] || '';
     
-    if (window.innerWidth < 768) document.getElementById('sidebar').classList.add('collapsed');
+    const sidebar = document.getElementById('sidebar');
+    if (window.innerWidth < 768) {
+        sidebar.classList.add('-translate-x-full');
+        document.getElementById('sidebar-overlay')?.classList.add('hidden');
+    } else {
+        sidebar.classList.add('md:hidden');
+    }
+    setTimeout(() => { if (currentState.pdfDoc) renderPage(); }, 300);
+    
     renderSubjects();
 
     document.getElementById('empty-state').classList.add('hidden');
+    document.getElementById('subject-dashboard')?.classList.add('hidden');
     const pdfCanvas = document.getElementById('pdf-canvas');
     const videoCont = document.getElementById('video-container');
 
