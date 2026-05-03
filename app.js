@@ -382,15 +382,36 @@ function toggleAiSource(fileId) {
 // 6. VISOR DE PDF, NOTAS Y NAVEGACIÓN
 // ==========================================
 function showEmptyState() {
-    document.getElementById('empty-state').classList.remove('hidden');
     document.getElementById('pdf-canvas').classList.add('hidden');
     document.getElementById('video-container').classList.add('hidden');
     document.getElementById('pdf-controls').classList.add('hidden');
-    document.getElementById('subject-dashboard')?.classList.add('hidden');
     document.getElementById('header-title').textContent = 'Workspace';
+    const headerIcon = document.getElementById('header-icon');
+    if(headerIcon) headerIcon.className = 'fas fa-folder-open text-slate-400 shrink-0 group-hover:text-primary-500 transition-colors';
     document.getElementById('notes-editor').innerHTML = '';
     currentState.currentFileId = null;
     currentState.currentSubject = null;
+
+    const dashboard = document.getElementById('subject-dashboard');
+    if (dashboard && appData.subjects && appData.subjects.length > 0) {
+        document.getElementById('empty-state').classList.add('hidden');
+        dashboard.classList.remove('hidden');
+        let html = `<div class="max-w-5xl mx-auto">`;
+        html += `<h2 class="text-2xl md:text-3xl font-bold text-slate-800 mb-2">Mi Workspace</h2>`;
+        html += `<p class="text-slate-500 mb-8">Selecciona una materia para ver sus recursos y apuntes.</p>`;
+        html += `<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">`;
+        
+        appData.subjects.forEach(sub => {
+            html += `<div onclick="openGeneralNotes('${sub.id}')" class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:shadow-lg hover:-translate-y-1 hover:border-primary-300 cursor-pointer transition-all duration-300 flex flex-col items-center text-center group"><div class="w-16 h-16 rounded-full bg-primary-50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300"><i class="fas ${sub.icon || 'fa-book'} text-3xl text-primary-500"></i></div><span class="text-sm font-bold text-slate-700 line-clamp-3 leading-snug">${sub.name}</span><span class="text-[10px] font-medium text-slate-400 bg-slate-50 px-2 py-1 rounded mt-3">${sub.files.length} recursos</span></div>`;
+        });
+        
+        html += `<div onclick="openModal('manage-subjects-modal')" class="bg-transparent p-5 rounded-2xl border-2 border-dashed border-slate-300 hover:border-primary-300 hover:bg-slate-50 cursor-pointer transition-all duration-300 flex flex-col items-center justify-center text-center group"><div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-3 group-hover:bg-primary-100 transition-colors"><i class="fas fa-plus text-slate-400 group-hover:text-primary-500"></i></div><span class="text-sm font-bold text-slate-500 group-hover:text-primary-600">Añadir Materia</span></div>`;
+        html += `</div></div>`;
+        dashboard.innerHTML = html;
+    } else {
+        document.getElementById('empty-state').classList.remove('hidden');
+        if (dashboard) dashboard.classList.add('hidden');
+    }
 }
 
 // CORRECCIÓN: Las notas generales cargan mediante el ID 'gen_IDMATERIA'

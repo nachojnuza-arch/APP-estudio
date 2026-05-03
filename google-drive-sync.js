@@ -16,11 +16,13 @@ window.GoogleDriveSync = {
     folderId: null,
     
     // 1. Inicializa la API de Google cuando carga la página
-    init() {
+    init(retries = 10) {
         if(typeof gapi !== 'undefined') {
             gapi.load('client', () => {
                 gapi.client.init({}).then(() => this.checkExistingToken());
             });
+        } else if (retries > 0) {
+            setTimeout(() => this.init(retries - 1), 500);
         } else {
             console.warn("La API de Google (GAPI) no se cargó correctamente.");
         }

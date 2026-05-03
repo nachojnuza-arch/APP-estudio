@@ -1,7 +1,7 @@
 ﻿<html lang="es"><head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Apuntes Facultad - Workspace</title>
+    <title>EstudIA</title>
 
     <!-- Favicon para evitar error 404 en la consola -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎓</text></svg>">
@@ -63,7 +63,7 @@
                 <div class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
                     <i class="fas fa-graduation-cap text-white text-sm"></i>
                 </div>
-                <span class="font-bold text-slate-800 tracking-tight text-base">StudyHub</span>
+                <span class="font-bold text-slate-800 tracking-tight text-base">EstudIA</span>
             </div>
             <button type="button" onclick="toggleSidebar()" title="Cerrar panel lateral" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 transition md:hidden">
                 <i class="fas fa-times text-xs"></i>
@@ -106,9 +106,9 @@
                 <button type="button" title="Alternar menú lateral" onclick="toggleSidebar()" class="w-9 h-9 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-500 shrink-0 transition">
                     <i class="fas fa-bars text-sm"></i>
                 </button>
-                <div class="flex items-center gap-2">
-                    <i id="header-icon" class="fas fa-folder-open text-slate-400 shrink-0"></i>
-                    <h1 id="header-title" class="font-medium text-slate-700 truncate max-w-[150px] md:max-w-xs sm:max-w-md text-sm md:text-base">Selecciona un archivo</h1>
+                <div class="flex items-center gap-2 cursor-pointer group" onclick="showEmptyState()" title="Volver al inicio">
+                    <i id="header-icon" class="fas fa-folder-open text-slate-400 shrink-0 group-hover:text-primary-500 transition-colors"></i>
+                    <h1 id="header-title" class="font-medium text-slate-700 truncate max-w-[150px] md:max-w-xs sm:max-w-md text-sm md:text-base group-hover:text-primary-600 transition-colors">Workspace</h1>
                 </div>
             </div>
             <div class="flex items-center gap-2">
