@@ -1516,7 +1516,7 @@ for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
 
         const body = {
             contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.3, maxOutputTokens: 2048 },
+            generationConfig: { temperature: 0.3, maxOutputTokens: 8192 },
             systemInstruction: {
                 parts: [{ text: task === 'quiz'
                     ? 'Eres un evaluador académico creando cuestionarios.'
@@ -1677,8 +1677,8 @@ function summarizeWithAI() {
             
             // Usamos tu función de RAG: extrae fragmentos precisos basados en tus apuntes
             const filteredContext = await extractGuidedSources(allNotes, {
-                maxChunks: 20, 
-                maxTokens: 2500, 
+                maxChunks: 30, 
+                maxTokens: 4000, 
                 minRelevanceScore: 0.15 
             });
 
@@ -1694,16 +1694,17 @@ function summarizeWithAI() {
                 contextMsg = `⚠️ Resumen basado solo en tus apuntes (sin resultados en PDFs).`;
             }
 
-            const prompt = `INSTRUCCIONES CRÍTICAS:
-1. El resultado debe ser una GUÍA DE ESTUDIO MUY EXTENSA Y DETALLADA (como si fuera un capítulo de un libro). NO hagas un resumen corto ni uses viñetas excesivas. Redacta párrafos completos y profundos.
-2. Expande cada tema mencionado en los apuntes del alumno usando TODO el detalle anatómico, fisiológico y clínico disponible en el contexto. No dejes ningún detalle fuera.
-3. Estructura el texto claramente usando TÍTULOS EN MAYÚSCULAS. Usa doble salto de línea (Enter) para separar párrafos de forma clara.
-4. NO uses formato Markdown con asteriscos (**) ni numerales (#). Usa texto simple, mayúsculas para los títulos principales, y listas simples con guiones (-) solo cuando sea estrictamente necesario enumerar.
-5. Mantén un tono académico, profundo, explicativo y exhaustivo. Escribe de manera fluida y narrativa.
-6. Devuelve ÚNICAMENTE el texto de los apuntes mejorados, sin introducciones conversacionales ni saludos.
+            const prompt = \`Actúa como un profesor universitario experto. Tu tarea es evaluar mis apuntes, corregirlos y crear una GUÍA DE ESTUDIO COMPLETA Y COHESIONADA.
+
+INSTRUCCIONES CRÍTICAS:
+1. CORRECCIÓN Y ANÁLISIS: Revisa mis apuntes originales. Identifica cualquier error, omisión o imprecisión y corrígelo explícitamente en una sección de "Correcciones a los apuntes".
+2. ACLARACIÓN DE CONFUSIONES: Agrega una sección explicando confusiones frecuentes o "trampas" comunes (diagnósticos diferenciales, términos similares) relacionadas con los temas de mis apuntes.
+3. INTEGRACIÓN DE CONTEXTO: Une los fragmentos del contexto (que provienen del libro y pueden estar fragmentados) dándoles un sentido lógico, narrativo y secuencial. Úsalos para expandir y profundizar mis apuntes.
+4. PROFUNDIDAD Y EXTENSIÓN: Desarrolla los temas con nivel universitario. No hagas un resumen corto; escribe párrafos completos. NO dejes la respuesta por la mitad (tienes un límite de palabras muy amplio para extenderte).
+5. ESTRUCTURA: Organiza la respuesta usando títulos en Markdown (###), usa negritas (**) para destacar términos clave. Sigue esta estructura: I. Correcciones, II. Confusiones Frecuentes, III. Desarrollo Completo Integrado.
 
 📝 MIS APUNTES ORIGINALES:
-${allNotes.length > 2000 ? allNotes.slice(0, 2000) + '...' : allNotes}
+${allNotes.length > 3000 ? allNotes.slice(0, 3000) + '...' : allNotes}
 
 📚 CONTEXTO DEL LIBRO (Fragmentos extraídos):
 ${contextForAI}`;
