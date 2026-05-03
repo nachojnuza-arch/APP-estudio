@@ -1,12 +1,10 @@
-﻿<!DOCTYPE html>
-<html lang="es">
-<head>
+﻿<html lang="es"><head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Apuntes Facultad - Workspace</title>
 
     <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://apis.google.com/_/scs/abc-static/_/js/k=gapi.lb.es.m945naLkzeo.O/m=client/rt=j/sv=1/d=1/ed=1/rs=AHpOoo8b2wMy9SgZXGvrI6mGCQQw0BbcqA/cb=gapi.loaded_0?le=scs,fedcm_migration_mod" async=""></script><script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome para íconos -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- html2canvas -->
@@ -16,47 +14,96 @@
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     
     <!-- Google Identity Services OAuth 2.0 -->
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://accounts.google.com/gsi/client" async="" defer=""></script>
+    <script src="https://apis.google.com/js/api.js" async="" defer="" gapi_processed="true"></script>
 
     <!-- MANIFEST PWA -->
     <link rel="manifest" href="manifest.json" id="pwa-manifest">
     <meta name="theme-color" content="#0f172a">
     <meta name="mobile-web-app-capable" content="yes">
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%230f172a'/%3E%3Ctext x='50' y='50' font-family='Arial' font-size='40' fill='white' dominant-baseline='middle' text-anchor='middle'%3EA%3C/text%3E%3C/svg%3E">
-    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%230f172a'/%3E%3Ctext x='50' y='50' font-family='Arial' font-size='40' fill='white' dominant-baseline='middle' text-anchor='middle'%3EA%3C/text%3E%3C/svg%3E">
 
     <!-- Estilos de la aplicación -->
     <link rel="stylesheet" href="app.css">
-</head>
-<body class="flex">
+    <style>
+        /* Ocultar flechas del input number */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
+        
+        /* Ajustes de la sidebar: ahora desaparece completamente al cerrarse (ancho 0) */
+        .sidebar { transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); width: 16rem; } /* w-64 = 16rem */
+        .sidebar.collapsed { width: 0 !important; border: none !important; opacity: 0; pointer-events: none; }
+    </style>
+<style>*, ::before, ::after{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }::backdrop{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }/* ! tailwindcss v3.4.17 | MIT License | https://tailwindcss.com */*,::after,::before{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}::after,::before{--tw-content:''}:host,html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;tab-size:4;font-family:ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}body{margin:0;line-height:inherit}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;font-feature-settings:normal;font-variation-settings:normal;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0;padding:0}legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}[hidden]:where(:not([hidden=until-found])){display:none}.pointer-events-none{pointer-events:none}.fixed{position:fixed}.absolute{position:absolute}.relative{position:relative}.inset-0{inset:0px}.bottom-0{bottom:0px}.bottom-6{bottom:1.5rem}.left-0{left:0px}.left-1\/2{left:50%}.right-0{right:0px}.right-2{right:0.5rem}.top-0{top:0px}.top-2{top:0.5rem}.z-10{z-index:10}.z-20{z-index:20}.z-30{z-index:30}.z-40{z-index:40}.z-50{z-index:50}.z-\[100\]{z-index:100}.z-\[200\]{z-index:200}.m-auto{margin:auto}.mx-1{margin-left:0.25rem;margin-right:0.25rem}.mx-auto{margin-left:auto;margin-right:auto}.my-6{margin-top:1.5rem;margin-bottom:1.5rem}.mb-1{margin-bottom:0.25rem}.mb-2{margin-bottom:0.5rem}.mb-4{margin-bottom:1rem}.mb-6{margin-bottom:1.5rem}.ml-2{margin-left:0.5rem}.mr-1{margin-right:0.25rem}.mt-1{margin-top:0.25rem}.ml-4{margin-left:1rem}.block{display:block}.flex{display:flex}.hidden{display:none}.h-screen{height:100vh}.h-14{height:3.5rem}.h-16{height:4rem}.h-2{height:0.5rem}.h-20{height:5rem}.h-4{height:1rem}.h-6{height:1.5rem}.h-7{height:1.75rem}.h-8{height:2rem}.h-full{height:100%}.h-3{height:0.75rem}.max-h-28{max-height:7rem}.max-h-60{max-height:15rem}.w-10{width:2.5rem}.w-12{width:3rem}.w-16{width:4rem}.w-2{width:0.5rem}.w-20{width:5rem}.w-8{width:2rem}.w-full{width:100%}.w-px{width:1px}.w-3{width:0.75rem}.w-5{width:1.25rem}.w-6{width:1.5rem}.min-w-0{min-width:0px}.min-w-\[14rem\]{min-width:14rem}.max-w-full{max-width:100%}.max-w-md{max-width:28rem}.max-w-none{max-width:none}.max-w-sm{max-width:24rem}.flex-1{flex:1 1 0%}.flex-shrink-0{flex-shrink:0}.flex-grow{flex-grow:1}.-translate-x-1\/2{--tw-translate-x:-50%;transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.transform{transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}@keyframes bounce{0%, 100%{transform:translateY(-25%);animation-timing-function:cubic-bezier(0.8,0,1,1)}50%{transform:none;animation-timing-function:cubic-bezier(0,0,0.2,1)}}.animate-bounce{animation:bounce 1s infinite}.cursor-pointer{cursor:pointer}.flex-col{flex-direction:column}.items-start{align-items:flex-start}.items-center{align-items:center}.justify-end{justify-content:flex-end}.justify-center{justify-content:center}.justify-between{justify-content:space-between}.gap-1{gap:0.25rem}.gap-2{gap:0.5rem}.gap-3{gap:0.75rem}.space-y-0\.5 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.125rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.125rem * var(--tw-space-y-reverse))}.space-y-1 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.25rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.25rem * var(--tw-space-y-reverse))}.space-y-2 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.5rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.5rem * var(--tw-space-y-reverse))}.space-y-4 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1rem * var(--tw-space-y-reverse))}.divide-y > :not([hidden]) ~ :not([hidden]){--tw-divide-y-reverse:0;border-top-width:calc(1px * calc(1 - var(--tw-divide-y-reverse)));border-bottom-width:calc(1px * var(--tw-divide-y-reverse))}.divide-slate-100 > :not([hidden]) ~ :not([hidden]){--tw-divide-opacity:1;border-color:rgb(241 245 249 / var(--tw-divide-opacity, 1))}.overflow-auto{overflow:auto}.overflow-hidden{overflow:hidden}.overflow-y-auto{overflow-y:auto}.overflow-x-hidden{overflow-x:hidden}.truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.whitespace-nowrap{white-space:nowrap}.rounded{border-radius:0.25rem}.rounded-2xl{border-radius:1rem}.rounded-full{border-radius:9999px}.rounded-lg{border-radius:0.5rem}.rounded-md{border-radius:0.375rem}.rounded-xl{border-radius:0.75rem}.rounded-tl-none{border-top-left-radius:0px}.border{border-width:1px}.border-b{border-bottom-width:1px}.border-t{border-top-width:1px}.border-l{border-left-width:1px}.border-emerald-200{--tw-border-opacity:1;border-color:rgb(167 243 208 / var(--tw-border-opacity, 1))}.border-red-200{--tw-border-opacity:1;border-color:rgb(254 202 202 / var(--tw-border-opacity, 1))}.border-slate-100{--tw-border-opacity:1;border-color:rgb(241 245 249 / var(--tw-border-opacity, 1))}.border-slate-200{--tw-border-opacity:1;border-color:rgb(226 232 240 / var(--tw-border-opacity, 1))}.border-slate-300{--tw-border-opacity:1;border-color:rgb(203 213 225 / var(--tw-border-opacity, 1))}.border-slate-800{--tw-border-opacity:1;border-color:rgb(30 41 59 / var(--tw-border-opacity, 1))}.border-slate-700{--tw-border-opacity:1;border-color:rgb(51 65 85 / var(--tw-border-opacity, 1))}.bg-white{--tw-bg-opacity:1;background-color:rgb(255 255 255 / var(--tw-bg-opacity, 1))}.bg-black{--tw-bg-opacity:1;background-color:rgb(0 0 0 / var(--tw-bg-opacity, 1))}.bg-black\/50{background-color:rgb(0 0 0 / 0.5)}.bg-blue-500{--tw-bg-opacity:1;background-color:rgb(59 130 246 / var(--tw-bg-opacity, 1))}.bg-emerald-50{--tw-bg-opacity:1;background-color:rgb(236 253 245 / var(--tw-bg-opacity, 1))}.bg-emerald-600{--tw-bg-opacity:1;background-color:rgb(5 150 105 / var(--tw-bg-opacity, 1))}.bg-indigo-50{--tw-bg-opacity:1;background-color:rgb(238 242 255 / var(--tw-bg-opacity, 1))}.bg-indigo-600{--tw-bg-opacity:1;background-color:rgb(79 70 229 / var(--tw-bg-opacity, 1))}.bg-red-50{--tw-bg-opacity:1;background-color:rgb(254 242 242 / var(--tw-bg-opacity, 1))}.bg-red-500{--tw-bg-opacity:1;background-color:rgb(239 68 68 / var(--tw-bg-opacity, 1))}.bg-slate-100{--tw-bg-opacity:1;background-color:rgb(241 245 249 / var(--tw-bg-opacity, 1))}.bg-slate-200{--tw-bg-opacity:1;background-color:rgb(226 232 240 / var(--tw-bg-opacity, 1))}.bg-slate-300{--tw-bg-opacity:1;background-color:rgb(203 213 225 / var(--tw-bg-opacity, 1))}.bg-slate-400{--tw-bg-opacity:1;background-color:rgb(148 163 184 / var(--tw-bg-opacity, 1))}.bg-slate-50{--tw-bg-opacity:1;background-color:rgb(248 250 252 / var(--tw-bg-opacity, 1))}.bg-slate-600{--tw-bg-opacity:1;background-color:rgb(71 85 105 / var(--tw-bg-opacity, 1))}.bg-slate-800{--tw-bg-opacity:1;background-color:rgb(30 41 59 / var(--tw-bg-opacity, 1))}.bg-slate-900{--tw-bg-opacity:1;background-color:rgb(15 23 42 / var(--tw-bg-opacity, 1))}.bg-slate-900\/90{background-color:rgb(15 23 42 / 0.9)}.bg-white\/90{background-color:rgb(255 255 255 / 0.9)}.p-1{padding:0.25rem}.p-2{padding:0.5rem}.p-3{padding:0.75rem}.p-4{padding:1rem}.p-5{padding:1.25rem}.p-6{padding:1.5rem}.p-8{padding:2rem}.px-1{padding-left:0.25rem;padding-right:0.25rem}.px-2{padding-left:0.5rem;padding-right:0.5rem}.px-3{padding-left:0.75rem;padding-right:0.75rem}.px-4{padding-left:1rem;padding-right:1rem}.px-6{padding-left:1.5rem;padding-right:1.5rem}.py-1\.5{padding-top:0.375rem;padding-bottom:0.375rem}.py-2{padding-top:0.5rem;padding-bottom:0.5rem}.py-2\.5{padding-top:0.625rem;padding-bottom:0.625rem}.py-3{padding-top:0.75rem;padding-bottom:0.75rem}.py-4{padding-top:1rem;padding-bottom:1rem}.py-1{padding-top:0.25rem;padding-bottom:0.25rem}.pl-2{padding-left:0.5rem}.text-center{text-align:center}.text-2xl{font-size:1.5rem;line-height:2rem}.text-3xl{font-size:1.875rem;line-height:2.25rem}.text-\[10px\]{font-size:10px}.text-lg{font-size:1.125rem;line-height:1.75rem}.text-sm{font-size:0.875rem;line-height:1.25rem}.text-xl{font-size:1.25rem;line-height:1.75rem}.text-xs{font-size:0.75rem;line-height:1rem}.font-bold{font-weight:700}.font-medium{font-weight:500}.font-semibold{font-weight:600}.uppercase{text-transform:uppercase}.italic{font-style:italic}.leading-relaxed{line-height:1.625}.tracking-wider{letter-spacing:0.05em}.text-slate-800{--tw-text-opacity:1;color:rgb(30 41 59 / var(--tw-text-opacity, 1))}.text-emerald-600{--tw-text-opacity:1;color:rgb(5 150 105 / var(--tw-text-opacity, 1))}.text-green-500{--tw-text-opacity:1;color:rgb(34 197 94 / var(--tw-text-opacity, 1))}.text-indigo-300{--tw-text-opacity:1;color:rgb(165 180 252 / var(--tw-text-opacity, 1))}.text-indigo-400{--tw-text-opacity:1;color:rgb(129 140 248 / var(--tw-text-opacity, 1))}.text-indigo-500{--tw-text-opacity:1;color:rgb(99 102 241 / var(--tw-text-opacity, 1))}.text-indigo-600{--tw-text-opacity:1;color:rgb(79 70 229 / var(--tw-text-opacity, 1))}.text-red-500{--tw-text-opacity:1;color:rgb(239 68 68 / var(--tw-text-opacity, 1))}.text-red-600{--tw-text-opacity:1;color:rgb(220 38 38 / var(--tw-text-opacity, 1))}.text-slate-300{--tw-text-opacity:1;color:rgb(203 213 225 / var(--tw-text-opacity, 1))}.text-slate-400{--tw-text-opacity:1;color:rgb(148 163 184 / var(--tw-text-opacity, 1))}.text-slate-500{--tw-text-opacity:1;color:rgb(100 116 139 / var(--tw-text-opacity, 1))}.text-slate-600{--tw-text-opacity:1;color:rgb(71 85 105 / var(--tw-text-opacity, 1))}.text-slate-700{--tw-text-opacity:1;color:rgb(51 65 85 / var(--tw-text-opacity, 1))}.text-white{--tw-text-opacity:1;color:rgb(255 255 255 / var(--tw-text-opacity, 1))}.text-blue-400{--tw-text-opacity:1;color:rgb(96 165 250 / var(--tw-text-opacity, 1))}.text-rose-400{--tw-text-opacity:1;color:rgb(251 113 133 / var(--tw-text-opacity, 1))}.opacity-0{opacity:0}.opacity-70{opacity:0.7}.shadow-2xl{--tw-shadow:0 25px 50px -12px rgb(0 0 0 / 0.25);--tw-shadow-colored:0 25px 50px -12px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.shadow-lg{--tw-shadow:0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);--tw-shadow-colored:0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -4px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.shadow-sm{--tw-shadow:0 1px 2px 0 rgb(0 0 0 / 0.05);--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.shadow-xl{--tw-shadow:0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);--tw-shadow-colored:0 20px 25px -5px var(--tw-shadow-color), 0 8px 10px -6px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.outline-none{outline:2px solid transparent;outline-offset:2px}.backdrop-blur-sm{--tw-backdrop-blur:blur(4px);-webkit-backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)}.transition-all{transition-property:all;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:150ms}.transition-colors{transition-property:color, background-color, border-color, fill, stroke, -webkit-text-decoration-color;transition-property:color, background-color, border-color, text-decoration-color, fill, stroke;transition-property:color, background-color, border-color, text-decoration-color, fill, stroke, -webkit-text-decoration-color;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:150ms}.hover\:bg-emerald-100:hover{--tw-bg-opacity:1;background-color:rgb(209 250 229 / var(--tw-bg-opacity, 1))}.hover\:bg-emerald-700:hover{--tw-bg-opacity:1;background-color:rgb(4 120 87 / var(--tw-bg-opacity, 1))}.hover\:bg-indigo-100:hover{--tw-bg-opacity:1;background-color:rgb(224 231 255 / var(--tw-bg-opacity, 1))}.hover\:bg-indigo-500:hover{--tw-bg-opacity:1;background-color:rgb(99 102 241 / var(--tw-bg-opacity, 1))}.hover\:bg-indigo-700:hover{--tw-bg-opacity:1;background-color:rgb(67 56 202 / var(--tw-bg-opacity, 1))}.hover\:bg-red-100:hover{--tw-bg-opacity:1;background-color:rgb(254 226 226 / var(--tw-bg-opacity, 1))}.hover\:bg-red-600:hover{--tw-bg-opacity:1;background-color:rgb(220 38 38 / var(--tw-bg-opacity, 1))}.hover\:bg-slate-100:hover{--tw-bg-opacity:1;background-color:rgb(241 245 249 / var(--tw-bg-opacity, 1))}.hover\:bg-slate-200:hover{--tw-bg-opacity:1;background-color:rgb(226 232 240 / var(--tw-bg-opacity, 1))}.hover\:bg-slate-200\/50:hover{background-color:rgb(226 232 240 / 0.5)}.hover\:bg-slate-50:hover{--tw-bg-opacity:1;background-color:rgb(248 250 252 / var(--tw-bg-opacity, 1))}.hover\:bg-slate-700:hover{--tw-bg-opacity:1;background-color:rgb(51 65 85 / var(--tw-bg-opacity, 1))}.hover\:bg-slate-800:hover{--tw-bg-opacity:1;background-color:rgb(30 41 59 / var(--tw-bg-opacity, 1))}.hover\:text-indigo-500:hover{--tw-text-opacity:1;color:rgb(99 102 241 / var(--tw-text-opacity, 1))}.hover\:text-indigo-600:hover{--tw-text-opacity:1;color:rgb(79 70 229 / var(--tw-text-opacity, 1))}.hover\:text-red-500:hover{--tw-text-opacity:1;color:rgb(239 68 68 / var(--tw-text-opacity, 1))}.hover\:text-slate-600:hover{--tw-text-opacity:1;color:rgb(71 85 105 / var(--tw-text-opacity, 1))}.hover\:text-white:hover{--tw-text-opacity:1;color:rgb(255 255 255 / var(--tw-text-opacity, 1))}.hover\:text-red-400:hover{--tw-text-opacity:1;color:rgb(248 113 113 / var(--tw-text-opacity, 1))}.focus\:outline-none:focus{outline:2px solid transparent;outline-offset:2px}.focus\:ring-2:focus{--tw-ring-offset-shadow:var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);--tw-ring-shadow:var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);box-shadow:var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000)}.focus\:ring-indigo-500:focus{--tw-ring-opacity:1;--tw-ring-color:rgb(99 102 241 / var(--tw-ring-opacity, 1))}.group:hover .group-hover\:opacity-100{opacity:1}@media (min-width: 640px){.sm\:block{display:block}.sm\:inline-block{display:inline-block}.sm\:inline{display:inline}}@media (min-width: 768px){.md\:relative{position:relative}.md\:z-20{z-index:20}.md\:flex{display:flex}.md\:hidden{display:none}.md\:w-\[450px\]{width:450px}.md\:border-l{border-left-width:1px}.md\:shadow-none{--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}}</style><style id="googleidentityservice_button_styles">.qJTHM{-moz-user-select:none;-webkit-user-select:none;-ms-user-select:none;color:#202124;direction:ltr;-webkit-touch-callout:none;font-family:Roboto-Regular,arial,sans-serif;-webkit-font-smoothing:antialiased;font-weight:400;margin:0;overflow:hidden;-webkit-text-size-adjust:100%}.ynRLnc{left:-9999px;position:absolute;top:-9999px}.L6cTce{display:none}.bltWBb{overflow-wrap:break-word;word-break:break-word}.hSRGPd{color:#1a73e8;cursor:pointer;font-weight:500;text-decoration:none}.Bz112c-W3lGp{height:16px;width:16px}.Bz112c-E3DyYd{height:20px;width:20px}.Bz112c-r9oPif{height:24px;width:24px}.Bz112c-u2z5K{height:36px;width:36px}.Bz112c-uaxL4e{border-radius:10px}.LgbsSe-Bz112c{display:block}.S9gUrf-YoZ4jf{border:none;margin:0;padding:0}.S9gUrf-YoZ4jf *{border:none;margin:0;padding:0}.fFW7wc-ibnC6b>.aZ2wEe>div{border-color:#4285f4}.P1ekSe-ZMv3u{-webkit-transition:height .2s linear;transition:height .2s linear}.P1ekSe-ZMv3u>div:first-child{background-color:#1a73e8!important;-webkit-transition:width .3s linear;transition:width .3s linear}.P1ekSe-ZMv3u>div:nth-child(2){background-image:-webkit-gradient(linear,left top,right top,from(rgba(255,255,255,.7)),to(rgba(255,255,255,.7))),-webkit-gradient(linear,left top,right top,from(#1a73e8),to(#1a73e8))!important;background-image:-webkit-linear-gradient(left,rgba(255,255,255,.7),rgba(255,255,255,.7)),-webkit-linear-gradient(left,#1a73e8,#1a73e8)!important;background-image:linear-gradient(90deg,rgba(255,255,255,.7),rgba(255,255,255,.7)),linear-gradient(90deg,#1a73e8,#1a73e8)!important}.P1ekSe-ZMv3u>div:nth-child(3){background-image:-webkit-gradient(linear,left top,right top,from(rgba(255,255,255,.7)),to(rgba(255,255,255,.7))),-webkit-gradient(linear,left top,right top,from(#1a73e8),to(#1a73e8))!important;background-image:-webkit-linear-gradient(left,rgba(255,255,255,.7),rgba(255,255,255,.7)),-webkit-linear-gradient(left,#1a73e8,#1a73e8)!important;background-image:linear-gradient(90deg,rgba(255,255,255,.7),rgba(255,255,255,.7)),linear-gradient(90deg,#1a73e8,#1a73e8)!important}.haAclf{display:inline-block}.nsm7Bb-HzV7m-LgbsSe{border-radius:4px;box-sizing:border-box;-webkit-transition:background-color .218s,border-color .218s;transition:background-color .218s,border-color .218s;-moz-user-select:none;-webkit-user-select:none;-ms-user-select:none;-webkit-appearance:none;background-color:#fff;background-image:none;border:1px solid #dadce0;color:#3c4043;cursor:pointer;font-family:Google Sans,arial,sans-serif;font-size:14px;height:40px;letter-spacing:.25px;outline:none;overflow:hidden;padding:0 12px;position:relative;text-align:center;vertical-align:middle;white-space:nowrap;width:auto}@media screen and (-ms-high-contrast:active){.nsm7Bb-HzV7m-LgbsSe{border:2px solid windowText;color:windowText}}@media screen and (preferes-contrast:more){.nsm7Bb-HzV7m-LgbsSe{color:#000}}.nsm7Bb-HzV7m-LgbsSe.pSzOP-SxQuSe{font-size:14px;height:32px;letter-spacing:.25px;padding:0 10px}.nsm7Bb-HzV7m-LgbsSe.purZT-SxQuSe{font-size:11px;height:20px;letter-spacing:.3px;padding:0 8px}.nsm7Bb-HzV7m-LgbsSe.Bz112c-LgbsSe{padding:0;width:40px}.nsm7Bb-HzV7m-LgbsSe.Bz112c-LgbsSe.pSzOP-SxQuSe{width:32px}.nsm7Bb-HzV7m-LgbsSe.Bz112c-LgbsSe.purZT-SxQuSe{width:20px}.nsm7Bb-HzV7m-LgbsSe.JGcpL-RbRzK{border-radius:20px}.nsm7Bb-HzV7m-LgbsSe.JGcpL-RbRzK.pSzOP-SxQuSe{border-radius:16px}.nsm7Bb-HzV7m-LgbsSe.JGcpL-RbRzK.purZT-SxQuSe{border-radius:10px}.nsm7Bb-HzV7m-LgbsSe.MFS4be-Ia7Qfc{border:none;color:#fff}.nsm7Bb-HzV7m-LgbsSe.MFS4be-v3pZbf-Ia7Qfc{background-color:#1a73e8}.nsm7Bb-HzV7m-LgbsSe.MFS4be-JaPV2b-Ia7Qfc{background-color:#202124;color:#e8eaed}@media screen and (prefers-contrast:more){.nsm7Bb-HzV7m-LgbsSe.MFS4be-JaPV2b-Ia7Qfc{color:#fff}}.nsm7Bb-HzV7m-LgbsSe .nsm7Bb-HzV7m-LgbsSe-Bz112c{height:18px;margin-right:8px;min-width:18px;width:18px}.nsm7Bb-HzV7m-LgbsSe.pSzOP-SxQuSe .nsm7Bb-HzV7m-LgbsSe-Bz112c{height:14px;min-width:14px;width:14px}.nsm7Bb-HzV7m-LgbsSe.purZT-SxQuSe .nsm7Bb-HzV7m-LgbsSe-Bz112c{height:10px;min-width:10px;width:10px}.nsm7Bb-HzV7m-LgbsSe.jVeSEe .nsm7Bb-HzV7m-LgbsSe-Bz112c{margin-left:8px;margin-right:-4px}.nsm7Bb-HzV7m-LgbsSe.Bz112c-LgbsSe .nsm7Bb-HzV7m-LgbsSe-Bz112c{margin:0;padding:10px}.nsm7Bb-HzV7m-LgbsSe.Bz112c-LgbsSe.pSzOP-SxQuSe .nsm7Bb-HzV7m-LgbsSe-Bz112c{padding:8px}.nsm7Bb-HzV7m-LgbsSe.Bz112c-LgbsSe.purZT-SxQuSe .nsm7Bb-HzV7m-LgbsSe-Bz112c{padding:4px}.nsm7Bb-HzV7m-LgbsSe .nsm7Bb-HzV7m-LgbsSe-Bz112c-haAclf{border-top-left-radius:3px;border-bottom-left-radius:3px;display:-webkit-box;display:-webkit-flex;display:flex;-webkit-box-pack:center;-webkit-justify-content:center;justify-content:center;-webkit-box-align:center;-webkit-align-items:center;align-items:center;background-color:#fff;height:36px;margin-left:-10px;margin-right:12px;min-width:36px;width:36px}.nsm7Bb-HzV7m-LgbsSe .nsm7Bb-HzV7m-LgbsSe-Bz112c-haAclf .nsm7Bb-HzV7m-LgbsSe-Bz112c,.nsm7Bb-HzV7m-LgbsSe.Bz112c-LgbsSe .nsm7Bb-HzV7m-LgbsSe-Bz112c-haAclf .nsm7Bb-HzV7m-LgbsSe-Bz112c{margin:0;padding:0}.nsm7Bb-HzV7m-LgbsSe.pSzOP-SxQuSe .nsm7Bb-HzV7m-LgbsSe-Bz112c-haAclf{height:28px;margin-left:-8px;margin-right:10px;min-width:28px;width:28px}.nsm7Bb-HzV7m-LgbsSe.purZT-SxQuSe .nsm7Bb-HzV7m-LgbsSe-Bz112c-haAclf{height:16px;margin-left:-6px;margin-right:8px;min-width:16px;width:16px}.nsm7Bb-HzV7m-LgbsSe.Bz112c-LgbsSe .nsm7Bb-HzV7m-LgbsSe-Bz112c-haAclf{border-radius:3px;margin-left:2px;margin-right:0;padding:0}.nsm7Bb-HzV7m-LgbsSe.JGcpL-RbRzK .nsm7Bb-HzV7m-LgbsSe-Bz112c-haAclf{border-radius:18px}.nsm7Bb-HzV7m-LgbsSe.pSzOP-SxQuSe.JGcpL-RbRzK .nsm7Bb-HzV7m-LgbsSe-Bz112c-haAclf{border-radius:14px}.nsm7Bb-HzV7m-LgbsSe.purZT-SxQuSe.JGcpL-RbRzK .nsm7Bb-HzV7m-LgbsSe-Bz112c-haAclf{border-radius:8px}.nsm7Bb-HzV7m-LgbsSe .nsm7Bb-HzV7m-LgbsSe-bN97Pc-sM5MNb{display:-webkit-box;display:-webkit-flex;display:flex;-webkit-align-items:center;-webkit-box-align:center;align-items:center;-webkit-flex-direction:row;-webkit-box-orient:horizontal;-webkit-box-direction:normal;flex-direction:row;-webkit-box-pack:justify;-webkit-justify-content:space-between;justify-content:space-between;-webkit-flex-wrap:nowrap;flex-wrap:nowrap;height:100%;position:relative;width:100%}.nsm7Bb-HzV7m-LgbsSe .oXtfBe-l4eHX{-webkit-box-pack:center;-webkit-justify-content:center;justify-content:center}.nsm7Bb-HzV7m-LgbsSe .nsm7Bb-HzV7m-LgbsSe-BPrWId{-webkit-flex-grow:1;-webkit-box-flex:1;flex-grow:1;font-family:Google Sans,arial,sans-serif;font-weight:500;overflow:hidden;text-overflow:ellipsis;vertical-align:top}.nsm7Bb-HzV7m-LgbsSe.purZT-SxQuSe .nsm7Bb-HzV7m-LgbsSe-BPrWId{font-weight:300}.nsm7Bb-HzV7m-LgbsSe .oXtfBe-l4eHX .nsm7Bb-HzV7m-LgbsSe-BPrWId{-webkit-flex-grow:0;-webkit-box-flex:0;flex-grow:0}.nsm7Bb-HzV7m-LgbsSe .nsm7Bb-HzV7m-LgbsSe-MJoBVe{-webkit-transition:background-color .218s;transition:background-color .218s;bottom:0;left:0;position:absolute;right:0;top:0}.nsm7Bb-HzV7m-LgbsSe:focus,.nsm7Bb-HzV7m-LgbsSe:hover{box-shadow:none;border-color:rgb(210,227,252);outline:none}.nsm7Bb-HzV7m-LgbsSe:focus-within{outline:2px solid #00639b;border-color:transparent}.nsm7Bb-HzV7m-LgbsSe:hover .nsm7Bb-HzV7m-LgbsSe-MJoBVe{background:rgba(66,133,244,.08)}.nsm7Bb-HzV7m-LgbsSe:active .nsm7Bb-HzV7m-LgbsSe-MJoBVe,.nsm7Bb-HzV7m-LgbsSe:focus .nsm7Bb-HzV7m-LgbsSe-MJoBVe{background:rgba(66,133,244,.1)}.nsm7Bb-HzV7m-LgbsSe.MFS4be-Ia7Qfc:hover .nsm7Bb-HzV7m-LgbsSe-MJoBVe{background:rgba(255,255,255,.24)}.nsm7Bb-HzV7m-LgbsSe.MFS4be-Ia7Qfc:active .nsm7Bb-HzV7m-LgbsSe-MJoBVe,.nsm7Bb-HzV7m-LgbsSe.MFS4be-Ia7Qfc:focus .nsm7Bb-HzV7m-LgbsSe-MJoBVe{background:rgba(255,255,255,.32)}.nsm7Bb-HzV7m-LgbsSe .n1UuX-DkfjY{border-radius:50%;display:-webkit-box;display:-webkit-flex;display:flex;height:20px;margin-left:-4px;margin-right:8px;min-width:20px;width:20px}.nsm7Bb-HzV7m-LgbsSe.jVeSEe .nsm7Bb-HzV7m-LgbsSe-BPrWId{font-family:Roboto;font-size:12px;text-align:left}.nsm7Bb-HzV7m-LgbsSe.jVeSEe .nsm7Bb-HzV7m-LgbsSe-BPrWId .K4efff .fmcmS,.nsm7Bb-HzV7m-LgbsSe.jVeSEe .nsm7Bb-HzV7m-LgbsSe-BPrWId .ssJRIf{overflow:hidden;text-overflow:ellipsis}.nsm7Bb-HzV7m-LgbsSe.jVeSEe .nsm7Bb-HzV7m-LgbsSe-BPrWId .K4efff{display:-webkit-box;display:-webkit-flex;display:flex;-webkit-align-items:center;-webkit-box-align:center;align-items:center;color:#5f6368;fill:#5f6368;font-size:11px;font-weight:400}.nsm7Bb-HzV7m-LgbsSe.jVeSEe.MFS4be-Ia7Qfc .nsm7Bb-HzV7m-LgbsSe-BPrWId .K4efff{color:#e8eaed;fill:#e8eaed}@media screen and (prefers-contrast:more){.nsm7Bb-HzV7m-LgbsSe.jVeSEe .nsm7Bb-HzV7m-LgbsSe-BPrWId .K4efff,.nsm7Bb-HzV7m-LgbsSe.jVeSEe.MFS4be-Ia7Qfc .nsm7Bb-HzV7m-LgbsSe-BPrWId .K4efff{color:#000;fill:#000}}.nsm7Bb-HzV7m-LgbsSe.jVeSEe .nsm7Bb-HzV7m-LgbsSe-BPrWId .K4efff .Bz112c{height:18px;margin:-3px -3px -3px 2px;min-width:18px;width:18px}.nsm7Bb-HzV7m-LgbsSe.jVeSEe .nsm7Bb-HzV7m-LgbsSe-Bz112c-haAclf{border-top-left-radius:0;border-bottom-left-radius:0;border-top-right-radius:3px;border-bottom-right-radius:3px;margin-left:12px;margin-right:-10px}.nsm7Bb-HzV7m-LgbsSe.jVeSEe.JGcpL-RbRzK .nsm7Bb-HzV7m-LgbsSe-Bz112c-haAclf{border-radius:18px}.L5Fo6c-sM5MNb{border:0;display:block;left:0;position:relative;top:0}.L5Fo6c-bF1uUb{border-radius:4px;bottom:0;cursor:pointer;left:0;position:absolute;right:0;top:0}.L5Fo6c-bF1uUb:focus{border:none;outline:none}sentinel{}</style></head>
+<body class="flex h-screen overflow-hidden bg-white text-slate-800">
 
     <!-- Notificaciones Toast -->
-    <div id="toast-container" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-[100] flex flex-col gap-2"></div>
+    <div id="toast-container" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-[100] flex flex-col gap-2 pointer-events-none"></div>
 
-    <!-- BARRA LATERAL (Archivos y Materias) -->
-    <aside id="sidebar" class="sidebar w-64 bg-slate-900 text-white flex flex-col flex-shrink-0 z-40 relative overflow-x-hidden transition-all duration-300 h-full">
+    <!-- BARRA LATERAL (CORREGIDA para no dejar franja azul) -->
+    <aside id="sidebar" class="sidebar bg-slate-900 text-white flex flex-col flex-shrink-0 z-50 absolute md:relative left-0 top-0 bottom-0 overflow-x-hidden h-full shadow-2xl md:shadow-none">
         <div class="h-14 flex items-center justify-between px-4 border-b border-slate-800 flex-shrink-0">
-            <div class="font-bold tracking-wider text-sm hide-on-collapse flex items-center gap-2">
+            <div class="font-bold tracking-wider text-sm flex items-center gap-2 whitespace-nowrap">
                 <i class="fas fa-graduation-cap text-indigo-400 text-lg"></i> STUDIO
             </div>
-            <button type="button" onclick="toggleSidebar()" title="Alternar barra lateral" aria-label="Alternar barra lateral" class="text-slate-400 hover:text-white transition-colors center-on-collapse w-full flex justify-end">
-                <i class="fas fa-bars"></i>
+            <button type="button" onclick="toggleSidebar()" title="Cerrar barra lateral" class="text-slate-400 hover:text-white transition-colors">
+                <i class="fas fa-times"></i>
             </button>
         </div>
 
-        <div class="flex-grow overflow-y-auto p-3">
-            <div class="text-[10px] uppercase font-bold text-slate-500 mb-2 px-2 hide-on-collapse">Tus Materias</div>
-            <ul id="subject-list" class="space-y-1">
-                <!-- Lista de materias y archivos se generará aquí -->
-            </ul>
+        <div class="flex-grow overflow-y-auto overflow-x-hidden p-3">
+            <div class="flex items-center justify-between mb-2 px-2 whitespace-nowrap">
+                <div class="text-[10px] uppercase font-bold text-slate-500">Tus Materias</div>
+                <!-- Indicador de estado de Drive -->
+                <div id="drive-sync-status" class="text-[10px] text-slate-500 cursor-pointer hover:text-white transition-colors" onclick="openModal('login-modal')" title="Sincronización con Drive">
+                    <i class="fas fa-cloud-upload-alt"></i> Local
+                </div>
+            </div>
+            <ul id="subject-list" class="space-y-1 w-full min-w-[14rem]"><li class="flex flex-col">
+            <div class="flex items-center justify-between p-2 cursor-pointer hover:bg-slate-800 rounded-lg transition-colors" onclick="toggleSubjectAccordion('sub_mok53ner')">
+                <div class="flex items-center gap-3 overflow-hidden"><i class="fas fa-book text-lg center-on-collapse w-6 text-center text-slate-400 flex-shrink-0"></i><span class="text-sm font-medium hide-on-collapse truncate">Parasito</span></div>
+                <i class="fas fa-chevron-right text-xs text-slate-500 hide-on-collapse"></i>
+            </div>
+            <ul class="hidden ml-4 pl-2 border-l border-slate-700 mt-1 space-y-1 hide-on-collapse">
+                <li class="group cursor-pointer rounded-lg flex items-center p-2 transition-colors hover:bg-slate-800 text-slate-300" onclick="openGeneralNotes('sub_mok53ner')"><i class="fas fa-pen-nib w-5 text-center text-xs opacity-70 flex-shrink-0"></i><span class="text-xs truncate">Apuntes Generales</span></li>
+                
+            <li class="group cursor-pointer rounded-lg flex items-center justify-between p-2 transition-colors hover:bg-slate-800 text-slate-300" onclick="openFile('sub_mok53ner', 'file_mok54vwj')">
+                <div class="flex items-center gap-2 overflow-hidden"><i class="fas fa-file-pdf text-rose-400 w-5 text-center text-xs flex-shrink-0"></i><span class="text-xs truncate hide-on-collapse">Libro de Cátedra Histicos y Hemáticos Parasitología.pdf</span><i class="fas fa-cloud text-blue-400 text-[10px]" title="Drive"></i></div>
+                <button onclick="removeFile(event, 'sub_mok53ner', 'file_mok54vwj')" class="opacity-0 group-hover:opacity-100 hover:text-red-400 px-1 hide-on-collapse"><i class="fas fa-times text-[10px]"></i></button>
+            </li>
+            <li class="group cursor-pointer rounded-lg flex items-center justify-between p-2 transition-colors hover:bg-slate-800 text-slate-300" onclick="openFile('sub_mok53ner', 'file_mok56of6')">
+                <div class="flex items-center gap-2 overflow-hidden"><i class="fas fa-file-pdf text-rose-400 w-5 text-center text-xs flex-shrink-0"></i><span class="text-xs truncate hide-on-collapse">TP N°7 copro.pdf</span><i class="fas fa-cloud text-blue-400 text-[10px]" title="Drive"></i></div>
+                <button onclick="removeFile(event, 'sub_mok53ner', 'file_mok56of6')" class="opacity-0 group-hover:opacity-100 hover:text-red-400 px-1 hide-on-collapse"><i class="fas fa-times text-[10px]"></i></button>
+            </li>
+            <li class="group cursor-pointer rounded-lg flex items-center justify-between p-2 transition-colors hover:bg-slate-800 text-slate-300" onclick="openFile('sub_mok53ner', 'file_mok6n5ei')">
+                <div class="flex items-center gap-2 overflow-hidden"><i class="fas fa-file-pdf text-rose-400 w-5 text-center text-xs flex-shrink-0"></i><span class="text-xs truncate hide-on-collapse">CV.pdf</span><i class="fas fa-cloud text-blue-400 text-[10px]" title="Drive"></i></div>
+                <button onclick="removeFile(event, 'sub_mok53ner', 'file_mok6n5ei')" class="opacity-0 group-hover:opacity-100 hover:text-red-400 px-1 hide-on-collapse"><i class="fas fa-times text-[10px]"></i></button>
+            </li>
+            <li class="group cursor-pointer rounded-lg flex items-center justify-between p-2 transition-colors hover:bg-slate-800 text-slate-300" onclick="openFile('sub_mok53ner', 'file_1777485879645')">
+                <div class="flex items-center gap-2 overflow-hidden"><i class="fas fa-file-pdf text-rose-400 w-5 text-center text-xs flex-shrink-0"></i><span class="text-xs truncate hide-on-collapse">Guía Trabajo Práctico Nº 7</span><i class="fas fa-cloud text-blue-400 text-[10px]" title="Drive"></i></div>
+                <button onclick="removeFile(event, 'sub_mok53ner', 'file_1777485879645')" class="opacity-0 group-hover:opacity-100 hover:text-red-400 px-1 hide-on-collapse"><i class="fas fa-times text-[10px]"></i></button>
+            </li>
+            </ul></li><li class="flex flex-col">
+            <div class="flex items-center justify-between p-2 cursor-pointer hover:bg-slate-800 rounded-lg transition-colors" onclick="toggleSubjectAccordion('sub_moka6tfs')">
+                <div class="flex items-center gap-3 overflow-hidden"><i class="fas fa-book text-lg center-on-collapse w-6 text-center text-slate-400 flex-shrink-0"></i><span class="text-sm font-medium hide-on-collapse truncate">Endocrino</span></div>
+                <i class="fas fa-chevron-right text-xs text-slate-500 hide-on-collapse"></i>
+            </div>
+            <ul class="hidden ml-4 pl-2 border-l border-slate-700 mt-1 space-y-1 hide-on-collapse">
+                <li class="group cursor-pointer rounded-lg flex items-center p-2 transition-colors hover:bg-slate-800 text-slate-300" onclick="openGeneralNotes('sub_moka6tfs')"><i class="fas fa-pen-nib w-5 text-center text-xs opacity-70 flex-shrink-0"></i><span class="text-xs truncate">Apuntes Generales</span></li>
+                
+            <li class="group cursor-pointer rounded-lg flex items-center justify-between p-2 transition-colors hover:bg-slate-800 text-slate-300" onclick="openFile('sub_moka6tfs', 'file_1777485853453')">
+                <div class="flex items-center gap-2 overflow-hidden"><i class="fas fa-file-pdf text-rose-400 w-5 text-center text-xs flex-shrink-0"></i><span class="text-xs truncate hide-on-collapse">12. Testículos</span><i class="fas fa-cloud text-blue-400 text-[10px]" title="Drive"></i></div>
+                <button onclick="removeFile(event, 'sub_moka6tfs', 'file_1777485853453')" class="opacity-0 group-hover:opacity-100 hover:text-red-400 px-1 hide-on-collapse"><i class="fas fa-times text-[10px]"></i></button>
+            </li>
+            </ul></li></ul>
         </div>
 
-        <div class="p-3 border-t border-slate-800 flex-shrink-0 space-y-2">
-            <button onclick="openAddFileModal()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg py-2 text-sm font-medium transition-colors flex items-center center-on-collapse justify-center gap-2 shadow-sm">
-                <i class="fas fa-plus"></i> <span class="hide-on-collapse">Nuevo Recurso</span>
+        <div class="p-3 border-t border-slate-800 flex-shrink-0 space-y-2 whitespace-nowrap">
+            <button onclick="openAddFileModal()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2 shadow-sm">
+                <i class="fas fa-plus"></i> <span>Nuevo Recurso</span>
             </button>
-            <button onclick="openModal('manage-subjects-modal')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg py-2 text-sm font-medium transition-colors flex items-center center-on-collapse justify-center gap-2 shadow-sm">
-                <i class="fas fa-cog"></i> <span class="hide-on-collapse">Ajustes / Materias</span>
+            <button onclick="openModal('manage-subjects-modal')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2 shadow-sm">
+                <i class="fas fa-cog"></i> <span>Ajustes</span>
             </button>
         </div>
     </aside>
@@ -67,10 +114,18 @@
         <!-- Topbar -->
         <header class="h-14 border-b border-slate-200 px-4 flex items-center justify-between bg-white z-30 shadow-sm flex-shrink-0 w-full">
             <div class="flex items-center gap-3 truncate">
+                <!-- NUEVO: Botón para abrir la sidebar si está cerrada -->
+                <button onclick="toggleSidebar()" class="text-slate-500 hover:text-indigo-600 transition-colors p-1" title="Abrir Menú">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="w-px h-6 bg-slate-200 mx-1"></div>
                 <i id="header-icon" class="fas fa-book-open text-slate-400"></i>
-                <h1 id="header-title" class="font-semibold text-slate-700 truncate text-sm">Bienvenido</h1>
+                <h1 id="header-title" class="font-semibold text-slate-700 truncate text-sm">Workspace</h1>
             </div>
             <div class="flex items-center gap-2">
+                <button onclick="saveData(true)" class="text-emerald-600 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 p-2 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium shadow-sm" title="Sincronizar cambios">
+                    <i class="fas fa-sync-alt"></i> <span class="hidden sm:inline">Guardar</span>
+                </button>
                 <button onclick="toggleReadingFilter()" class="text-slate-400 hover:text-indigo-500 p-2 rounded-lg transition-colors" title="Filtro de lectura" id="reading-filter-btn">
                     <i class="fas fa-eye"></i>
                 </button>
@@ -83,13 +138,13 @@
             </div>
         </header>
 
-        <!-- Contenido de Trabajo (Split View) anclado estáticamente al contenedor padre -->
+        <!-- Contenido de Trabajo (Split View) -->
         <div class="flex-1 flex overflow-hidden relative">
 
             <!-- Visor Izquierdo (Media) -->
-            <div id="media-viewer" class="flex-1 bg-slate-100 relative overflow-y-auto flex justify-center items-start panel-transition h-full w-full">
+            <div id="media-viewer" class="flex-1 bg-slate-100 relative overflow-auto flex justify-center items-start panel-transition h-full w-full">
 
-                <!-- Estado Vacío Absoluto y Centrado -->
+                <!-- Estado Vacío -->
                 <div id="empty-state" class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 z-10 m-auto h-full w-full pointer-events-none">
                     <div class="w-20 h-20 bg-white rounded-2xl shadow-sm border border-slate-200 flex items-center justify-center mb-4">
                         <i id="empty-state-icon" class="fas fa-folder-open text-3xl text-indigo-300"></i>
@@ -103,22 +158,31 @@
                 <div id="video-container" class="hidden w-full h-full bg-black relative z-20"></div>
 
                 <!-- Controles PDF Flotantes -->
-                <div id="pdf-controls" class="hidden fixed bottom-6 left-1/2 transform -translate-x-1/2 glass-panel shadow-lg border border-slate-200 rounded-full px-4 py-2 flex items-center gap-4 text-sm z-30">
-                    <button type="button" onclick="changePage(-1)" title="Página anterior" class="text-slate-600 hover:text-indigo-600"><i class="fas fa-chevron-left"></i></button>
-                    <span id="page-info" class="font-medium text-slate-700 min-w-[60px] text-center">1 / 1</span>
-                    <button type="button" onclick="changePage(1)" title="Página siguiente" class="text-slate-600 hover:text-indigo-600"><i class="fas fa-chevron-right"></i></button>
-                    <div class="w-px h-4 bg-slate-300 mx-1"></div>
-                    <button type="button" onclick="changeZoom(-0.2)" title="Disminuir zoom" class="text-slate-600 hover:text-indigo-600"><i class="fas fa-search-minus"></i></button>
-                    <span id="zoom-info" class="text-xs text-slate-500 w-10 text-center">100%</span>
-                    <button type="button" onclick="changeZoom(0.2)" title="Aumentar zoom" class="text-slate-600 hover:text-indigo-600"><i class="fas fa-search-plus"></i></button>
+                <div id="pdf-controls" class="hidden fixed bottom-6 left-1/2 transform -translate-x-1/2 glass-panel shadow-lg border border-slate-200 rounded-full px-4 py-2 flex items-center gap-3 text-sm z-30 bg-white/90 backdrop-blur-sm">
+                    <button type="button" onclick="changePage(-1)" title="Página anterior" class="text-slate-600 hover:text-indigo-600 px-2"><i class="fas fa-chevron-left"></i></button>
+                    
+                    <div class="flex items-center gap-1">
+                        <input type="number" id="page-input" class="w-12 h-7 text-center text-sm font-medium border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none text-slate-700 bg-white" value="1" min="1" onchange="goToPage(this.value)" onkeydown="if(event.key === 'Enter') goToPage(this.value)">
+                        <span class="text-sm text-slate-500 font-medium whitespace-nowrap">de <span id="page-total">1</span></span>
+                    </div>
+
+                    <button type="button" onclick="changePage(1)" title="Página siguiente" class="text-slate-600 hover:text-indigo-600 px-2"><i class="fas fa-chevron-right"></i></button>
+                    
+                    <div class="hidden sm:block w-px h-4 bg-slate-300 mx-1"></div>
+                    
+                    <button type="button" onclick="changeZoom(-0.2)" title="Disminuir zoom" class="hidden sm:block text-slate-600 hover:text-indigo-600 px-1"><i class="fas fa-search-minus"></i></button>
+                    <span id="zoom-info" class="hidden sm:inline-block text-xs text-slate-500 w-10 text-center font-medium">100%</span>
+                    <button type="button" onclick="changeZoom(0.2)" title="Aumentar zoom" class="hidden sm:block text-slate-600 hover:text-indigo-600 px-1"><i class="fas fa-search-plus"></i></button>
                 </div>
             </div>
 
             <!-- Panel Derecho (Notas e IA) -->
-            <!-- Usamos flex flex-col en lugar de hidden por defecto para mantener su estructura -->
-            <div id="notes-panel" class="w-full md:w-[450px] max-w-full border-l border-slate-200 bg-white flex flex-col flex-shrink-0 panel-transition z-20 h-full relative">
+            <div id="notes-panel" class="hidden md:flex absolute md:relative right-0 top-0 bottom-0 w-full md:w-[450px] max-w-full md:border-l border-slate-200 bg-white flex-col flex-shrink-0 panel-transition z-40 md:z-20 h-full shadow-2xl md:shadow-none">
                 <!-- Pestañas -->
-                <div class="flex border-b border-slate-200 bg-slate-50 p-1 gap-1 flex-shrink-0">
+                <div class="flex border-b border-slate-200 bg-slate-50 p-1 gap-1 flex-shrink-0 relative">
+                    <button onclick="toggleNotesPanel()" class="md:hidden absolute right-2 top-2 text-slate-400 hover:text-slate-600 p-1 z-10" title="Cerrar Panel">
+                        <i class="fas fa-times"></i>
+                    </button>
                     <button onclick="switchTab('notes')" id="tab-btn-notes" class="flex-1 py-2 text-sm font-semibold rounded-md bg-white shadow-sm text-indigo-600 transition-all">
                         <i class="fas fa-pen-nib mr-1"></i> Apuntes
                     </button>
@@ -133,24 +197,24 @@
                         <div class="flex gap-1">
                             <button type="button" title="Negrita" onclick="document.execCommand('bold', false, null)" class="w-8 h-8 rounded hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-bold"></i></button>
                             <button type="button" title="Cursiva" onclick="document.execCommand('italic', false, null)" class="w-8 h-8 rounded hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-italic"></i></button>
-                            <button type="button" title="Lista con viñetas" onclick="document.execCommand('insertUnorderedList', false, null)" class="w-8 h-8 rounded hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-list-ul"></i></button>
+                            <button type="button" title="Lista" onclick="document.execCommand('insertUnorderedList', false, null)" class="w-8 h-8 rounded hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-list-ul"></i></button>
                         </div>
                         <div class="flex items-center gap-3">
                             <span id="save-status" class="text-xs text-slate-400"><i class="fas fa-check text-green-500"></i> Guardado</span>
-                            <button type="button" title="Exportar notas como documento Word" onclick="exportNotesAsDocx()" class="text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded transition-colors flex items-center gap-1">
+                            <button type="button" title="Exportar notas" onclick="exportNotesAsDocx()" class="text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded transition-colors flex items-center gap-1">
                                 <i class="fas fa-file-word"></i> Exportar
                             </button>
                         </div>
                     </div>
-                    <div id="notes-editor" contenteditable="true" class="flex-1 p-5 overflow-y-auto" data-placeholder="Comienza a escribir tus apuntes aquí..."></div>
+                    <div id="notes-editor" contenteditable="true" class="flex-1 p-5 overflow-y-auto focus:outline-none" data-placeholder="Comienza a escribir tus apuntes aquí..."></div>
                 </div>
 
                 <!-- Contenido Pestaña IA -->
                 <div id="tab-content-ai" class="hidden flex-1 flex flex-col overflow-hidden bg-slate-50">
                     <div class="p-4 border-b border-slate-200 bg-white flex justify-between items-center flex-shrink-0">
                         <label class="block text-xs font-bold text-slate-500 uppercase">Acciones Rápidas</label>
-                        <button onclick="openApiModal()" class="text-slate-400 hover:text-indigo-600 transition-colors text-sm" title="Configurar API Key">
-                            <i class="fas fa-cog"></i> Configuración IA
+                        <button onclick="openModal('api-modal')" class="text-slate-400 hover:text-indigo-600 transition-colors text-sm" title="Configurar API Key">
+                            <i class="fas fa-cog"></i> API
                         </button>
                     </div>
                     <div class="p-4 border-b border-slate-200 bg-white flex-shrink-0">
@@ -158,47 +222,59 @@
                             <i class="fas fa-file-alt"></i> Resumen Local (sin IA)
                         </button>
                         <button onclick="summarizeWithAI()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2.5 px-3 rounded shadow-sm transition-colors flex justify-center items-center gap-2 mb-2">
-                            <i class="fas fa-robot"></i> Resumen con IA (páginas relevantes)
+                            <i class="fas fa-robot"></i> Resumen con IA
                         </button>
-                        <div class="grid grid-cols-2 gap-2">
-                            <button onclick="generateQuiz()" class="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold py-2 px-3 rounded shadow-sm transition-colors flex justify-center items-center gap-2">
-                                <i class="fas fa-question-circle"></i> Quiz IA
-                            </button>
-                            <button onclick="generateLocalQuiz()" class="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold py-2 px-3 rounded shadow-sm transition-colors flex justify-center items-center gap-2">
-                                <i class="fas fa-list-ol"></i> Quiz Local
-                            </button>
-                        </div>
-                        <button onclick="diagnoseAPI()" class="w-full mt-2 text-[10px] text-slate-400 hover:text-indigo-500 flex items-center justify-center gap-1">
-                            <i class="fas fa-stethoscope"></i> Diagnóstico de API
+                        <button onclick="generateQuiz()" class="w-full bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold py-2 px-3 rounded shadow-sm transition-colors flex justify-center items-center gap-2">
+                            <i class="fas fa-question-circle"></i> Quiz IA
                         </button>
                     </div>
-
-                    <!-- Fuentes seleccionables para IA -->
+                    
+                    <!-- RESTAURADO: Sector de Fuentes IA -->
                     <div class="px-4 py-2 border-b border-slate-200 bg-slate-50 flex-shrink-0">
                         <div class="flex items-center justify-between mb-1">
                             <label class="text-[10px] font-bold text-slate-400 uppercase">📚 Fuentes IA</label>
                             <span id="ai-source-count" class="text-[10px] text-indigo-500 font-medium">0 seleccionadas</span>
                         </div>
-                        <div id="ai-sources-list" class="max-h-28 overflow-y-auto space-y-0.5">
-                            <p class="text-xs text-slate-400 italic p-1">Cargando fuentes...</p>
-                        </div>
+                        <div id="ai-sources-list" class="max-h-28 overflow-y-auto space-y-0.5"><div class="mb-2"><div class="text-[10px] font-bold text-slate-500 uppercase px-2 mb-1">Parasito</div><label class="flex items-center gap-2 px-2 py-1 hover:bg-slate-200 rounded cursor-pointer transition-colors">
+                <input type="checkbox" class="w-3 h-3 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" onchange="toggleAiSource('file_mok54vwj')">
+                <i class="fas fa-file-pdf text-rose-400 text-xs"></i>
+                <span class="text-xs text-slate-600 truncate flex-1">Libro de Cátedra Histicos y Hemáticos Parasitología.pdf</span>
+            </label><label class="flex items-center gap-2 px-2 py-1 hover:bg-slate-200 rounded cursor-pointer transition-colors">
+                <input type="checkbox" class="w-3 h-3 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" onchange="toggleAiSource('file_mok56of6')">
+                <i class="fas fa-file-pdf text-rose-400 text-xs"></i>
+                <span class="text-xs text-slate-600 truncate flex-1">TP N°7 copro.pdf</span>
+            </label><label class="flex items-center gap-2 px-2 py-1 hover:bg-slate-200 rounded cursor-pointer transition-colors">
+                <input type="checkbox" class="w-3 h-3 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" onchange="toggleAiSource('file_mok6n5ei')">
+                <i class="fas fa-file-pdf text-rose-400 text-xs"></i>
+                <span class="text-xs text-slate-600 truncate flex-1">CV.pdf</span>
+            </label><label class="flex items-center gap-2 px-2 py-1 hover:bg-slate-200 rounded cursor-pointer transition-colors">
+                <input type="checkbox" class="w-3 h-3 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" onchange="toggleAiSource('file_1777485879645')">
+                <i class="fas fa-file-pdf text-rose-400 text-xs"></i>
+                <span class="text-xs text-slate-600 truncate flex-1">Guía Trabajo Práctico Nº 7</span>
+            </label></div><div class="mb-2"><div class="text-[10px] font-bold text-slate-500 uppercase px-2 mb-1">Endocrino</div><label class="flex items-center gap-2 px-2 py-1 hover:bg-slate-200 rounded cursor-pointer transition-colors">
+                <input type="checkbox" class="w-3 h-3 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" onchange="toggleAiSource('file_1777485853453')">
+                <i class="fas fa-file-pdf text-rose-400 text-xs"></i>
+                <span class="text-xs text-slate-600 truncate flex-1">12. Testículos</span>
+            </label></div></div>
                     </div>
 
                     <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
-                        <div class="msg-ai p-3 text-sm shadow-sm">
-                            ¡Hola! Soy tu asistente de estudio. Puedes pedirme que resuma el texto o genere un cuestionario en base a tus apuntes actuales.
+                        <div class="msg-ai p-3 text-sm shadow-sm bg-white border border-slate-200 rounded-xl rounded-tl-none">
+                            ¡Hola! Soy tu asistente de estudio. Selecciona una acción rápida arriba para resumir tus notas actuales.
                         </div>
                     </div>
-
-                    <div id="typing-indicator" class="hidden px-4 pb-2 text-xs text-slate-400 italic animate-pulse flex-shrink-0">
-                        <i class="fas fa-circle-notch fa-spin mr-1"></i> La IA está pensando...
+                    <div id="typing-indicator" class="hidden p-4 flex gap-1 items-center bg-slate-50 border-t border-slate-200">
+                        <span class="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></span>
+                        <span class="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></span>
+                        <span class="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 0.4s"></span>
+                        <span class="text-xs text-slate-500 ml-2">IA escribiendo...</span>
                     </div>
                 </div>
             </div>
         </div>
     </main>
 
-    <!-- Loading indicator para procesos de IA -->
+    <!-- Loading indicator -->
     <div id="loading" class="hidden fixed inset-0 bg-black/50 z-[100] flex items-center justify-center">
         <div class="bg-white rounded-xl p-5 flex items-center gap-3 shadow-2xl">
             <i class="fas fa-spinner fa-spin text-indigo-600 text-xl"></i>
@@ -208,40 +284,37 @@
 
     <!-- Pantalla completa para resultados de IA -->
     <div id="ai-fullscreen" class="hidden fixed inset-0 bg-white z-[200] flex flex-col">
-        <!-- Toolbar superior -->
         <div class="flex items-center justify-between px-4 py-2 border-b border-slate-200 bg-slate-50 flex-shrink-0">
             <div class="flex items-center gap-2">
                 <i class="fas fa-file-alt text-indigo-600"></i>
                 <span id="ai-fullscreen-title" class="font-semibold text-slate-700 text-sm">Resultado</span>
             </div>
             <div class="flex items-center gap-2">
-                <button onclick="downloadAIResult()" class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1" title="Descargar como DOC">
-                    <i class="fas fa-download"></i> Descargar DOC
-                </button>
-                <button onclick="toggleEditAIResult()" id="ai-edit-btn" class="text-xs bg-slate-600 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1" title="Editar contenido">
+                <button id="ai-edit-btn" onclick="toggleEditAIResult()" class="text-xs bg-slate-600 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
                     <i class="fas fa-edit"></i> Editar
                 </button>
-                <button onclick="closeAIFullscreen()" class="text-xs bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1" title="Cerrar">
+                <button onclick="downloadAIResult()" class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+                    <i class="fas fa-download"></i> Descargar DOC
+                </button>
+                <button onclick="closeAIFullscreen()" class="text-xs bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
                     <i class="fas fa-times"></i> Cerrar
                 </button>
             </div>
         </div>
-        <!-- Contenido editable -->
-        <div id="ai-fullscreen-content" contenteditable="true" class="flex-1 overflow-y-auto p-6 text-sm text-slate-700 leading-relaxed prose prose-slate max-w-none focus:outline-none whitespace-pre-wrap" style="max-width: 900px; margin: 0 auto; width: 100%;">
+        <div id="ai-fullscreen-content" contenteditable="true" class="flex-1 overflow-y-auto p-6 text-sm text-slate-700 leading-relaxed prose prose-slate max-w-none focus:outline-none" style="max-width: 900px; margin: 0 auto; width: 100%;">
         </div>
-        <!-- Barra inferior con info -->
         <div id="ai-fullscreen-footer" class="flex-shrink-0 border-t border-slate-200 bg-slate-50 px-4 py-1.5 flex items-center justify-between text-[10px] text-slate-400">
-            <span id="ai-fullscreen-footer-text">✅ Listo - Resumen generado completamente localmente sin IA</span>
-            <span id="ai-fullscreen-time"></span>
+            <span id="ai-fullscreen-time">Generando...</span>
+            <span>✅ Listo</span>
         </div>
     </div>
 
     <!-- MODAL: Gestionar Materias -->
-    <div id="manage-subjects-modal" class="fixed inset-0 modal-overlay hidden z-50 flex justify-center items-center">
+    <div id="manage-subjects-modal" class="fixed inset-0 bg-black/50 hidden z-50 flex justify-center items-center">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
             <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
                 <h3 class="text-lg font-bold text-slate-800">Gestionar Materias</h3>
-                <button type="button" onclick="closeModal('manage-subjects-modal')" class="text-slate-400 hover:text-slate-600" title="Cerrar modal" aria-label="Cerrar modal"><i class="fas fa-times"></i></button>
+                <button type="button" onclick="closeModal('manage-subjects-modal')" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
             </div>
             <div class="p-6 space-y-4">
                 <div class="flex gap-2">
@@ -249,136 +322,84 @@
                     <button onclick="addSubject()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Añadir</button>
                 </div>
                 <div class="max-h-60 overflow-y-auto border border-slate-200 rounded-lg">
-                    <ul id="modal-subject-list" class="divide-y divide-slate-100">
-                        <!-- Lista de materias -->
-                    </ul>
+                    <ul id="modal-subject-list" class="divide-y divide-slate-100"></ul>
                 </div>
-            </div>
-            <div class="bg-slate-50 px-6 py-4 border-t border-slate-100 flex justify-end">
-                <button onclick="closeModal('manage-subjects-modal')" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors">Hecho</button>
             </div>
         </div>
     </div>
 
     <!-- MODAL: Añadir Archivo -->
-    <div id="add-file-modal" class="fixed inset-0 modal-overlay hidden z-50 flex justify-center items-center">
+    <div id="add-file-modal" class="fixed inset-0 bg-black/50 hidden z-50 flex justify-center items-center">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
             <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-                <h3 class="text-lg font-bold text-slate-800">Añadir Recurso a la Materia</h3>
-                <button type="button" onclick="closeModal('add-file-modal')" class="text-slate-400 hover:text-slate-600" title="Cerrar"><i class="fas fa-times"></i></button>
+                <h3 class="text-lg font-bold text-slate-800">Añadir Recurso</h3>
+                <button type="button" onclick="closeModal('add-file-modal')" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
             </div>
             <div class="p-6 space-y-4">
-                
-                <div id="subject-selector-container">
+                <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Materia Destino</label>
-                    <select id="file-target-subject" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-slate-50" title="Selecciona la materia donde guardar el recurso">
-                        <!-- Se llenará dinámicamente -->
-                    </select>
+                    <select id="file-target-subject" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none bg-slate-50"></select>
                 </div>
-
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Tipo de Archivo</label>
-                    <select id="file-type" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" onchange="toggleFileInputs()" title="Tipo de Archivo">
-                        <option value="pdf_local">PDF desde mi dispositivo (Permanente)</option>
-                        <option value="pdf_url">PDF desde Enlace (Drive/Web)</option>
-                        <option value="video">Video (YouTube/Link)</option>
+                    <select id="file-type" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none" onchange="document.getElementById('input-local').classList.toggle('hidden', this.value !== 'pdf_local'); document.getElementById('input-url').classList.toggle('hidden', this.value === 'pdf_local');">
+                        <option value="pdf_local">PDF desde mi dispositivo</option>
+                        <option value="pdf_url">Enlace Web</option>
+                        <option value="video">Video Externo</option>
                     </select>
                 </div>
-                
                 <div id="input-local">
-                    <label for="file-upload" class="block text-sm font-medium text-slate-700 mb-1">Seleccionar Archivo</label>
-                    <input type="file" id="file-upload" accept="application/pdf" title="Seleccionar archivo PDF" aria-label="Seleccionar archivo PDF desde su dispositivo" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer border border-slate-200 rounded-lg p-1">
+                    <input type="file" id="file-upload" accept="application/pdf" class="w-full text-sm text-slate-500 border border-slate-200 rounded-lg p-1">
                 </div>
-                
                 <div id="input-url" class="hidden">
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Enlace (URL)</label>
-                    <input type="url" id="file-url" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="https://...">
+                    <input type="url" id="file-url" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none" placeholder="https://...">
                 </div>
-
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Nombre del tema/documento</label>
-                    <input type="text" id="file-name" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ej: Unidad 1 - Introducción">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Nombre (Opcional si es PDF)</label>
+                    <input type="text" id="file-name" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none" placeholder="Si lo dejas vacío, usará el nombre del archivo">
                 </div>
             </div>
             <div class="bg-slate-50 px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
                 <button onclick="closeModal('add-file-modal')" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">Cancelar</button>
-                <button onclick="confirmAddFile()" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm">Guardar Recurso</button>
+                <button onclick="confirmAddFile()" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors">Guardar</button>
             </div>
         </div>
     </div>
 
     <!-- MODAL: Configurar API Key -->
-    <div id="api-modal" class="fixed inset-0 modal-overlay hidden z-50 flex justify-center items-center">
+    <div id="api-modal" class="fixed inset-0 bg-black/50 hidden z-50 flex justify-center items-center">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden p-6 text-center">
-            <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 text-xl">
-                <i class="fas fa-key"></i>
-            </div>
             <h3 class="text-lg font-bold text-slate-800 mb-2">Configuración IA</h3>
-            <p class="text-sm text-slate-500 mb-6">Ingresa tu API Key de Google Gemini para usar las funciones de resumen y cuestionario.</p>
-            
-            <input type="password" id="api-key-input" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-4 text-center focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="AIzaSy...">
-            
-            <button onclick="saveApiKey()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg py-2 transition-colors mb-2">Guardar y Continuar</button>
-            <button onclick="closeModal('api-modal')" class="w-full text-slate-400 hover:text-slate-600 text-sm font-medium py-2">Cancelar</button>
+            <p class="text-sm text-slate-500 mb-6">Ingresa tu API Key de Google Gemini.</p>
+            <input type="password" id="api-key-input" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-4 text-center outline-none">
+            <button onclick="saveApiKey()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg py-2 mb-2">Guardar</button>
+            <button onclick="closeModal('api-modal')" class="w-full text-slate-400 text-sm py-2">Cancelar</button>
         </div>
     </div>
 
-    <!-- MODAL: Captura de Pantalla -->
-    <div id="screenshot-modal" class="fixed inset-0 modal-overlay hidden z-50 flex justify-center items-center">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
-            <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-                <h3 class="text-lg font-bold text-slate-800">Captura de Pantalla</h3>
-                <button type="button" onclick="closeModal('screenshot-modal')" class="text-slate-400 hover:text-slate-600" title="Cerrar modal" aria-label="Cerrar ventana de captura de pantalla"><i class="fas fa-times"></i></button>
-            </div>
-            <div class="p-6">
-                <p class="text-sm text-slate-600 mb-4">Presiona <kbd class="px-2 py-1 bg-slate-200 rounded text-xs font-mono">Ctrl</kbd> y arrastra el mouse sobre el documento para seleccionar un área.</p>
-                <div id="screenshot-preview" class="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center text-slate-400">
-                    <i class="fas fa-camera text-3xl mb-2"></i>
-                    <p class="text-sm">El área seleccionada aparecerá aquí</p>
-                </div>
-                <div class="mt-4 flex gap-2">
-                    <button onclick="insertScreenshotAsImage()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm font-medium transition-colors">
-                        <i class="fas fa-image mr-1"></i> Insertar como Imagen
-                    </button>
-                    <button onclick="closeModal('screenshot-modal')" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 py-2 rounded-lg text-sm font-medium transition-colors">
-                        Cancelar
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL: Login Google Drive -->
-    <div id="login-modal" class="fixed inset-0 modal-overlay z-50 flex justify-center items-center bg-slate-900/90 hidden">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all p-8 text-center">
-            <div class="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <i class="fas fa-cloud text-white text-3xl"></i>
-            </div>
-            
-            <h2 class="text-xl font-bold text-slate-800 mb-2">Sincronizar con Google Drive</h2>
-            <p class="text-sm text-slate-500 mb-6">Inicia sesión con tu cuenta de Google para guardar y sincronizar todos tus apuntes en la nube automáticamente.</p>
-            
-            <button onclick="loginWithGoogle()" class="w-full bg-white hover:bg-slate-50 text-slate-700 font-semibold py-3 px-4 border border-slate-300 rounded-lg shadow-sm transition-colors flex items-center justify-center gap-3">
-                <svg viewBox="0 0 24 24" class="w-5 h-5">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                    <path d="M1 1h22v22H1z" fill="none"/>
-                </svg>
-                Iniciar sesión con Google
+    <!-- MODAL: Drive Login -->
+    <div id="login-modal" class="fixed inset-0 bg-slate-900/90 hidden z-50 flex justify-center items-center">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8 text-center">
+            <div class="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4"><i class="fas fa-cloud text-white text-2xl"></i></div>
+            <h2 class="text-xl font-bold text-slate-800 mb-2">Google Drive</h2>
+            <p id="drive-modal-desc" class="text-sm text-slate-500 mb-6">Inicia sesión para guardar y sincronizar PDFs y notas en "APP Estudio - Datos".</p>
+            <button id="btn-login-drive" onclick="window.GoogleDriveSync.login()" class="w-full bg-white border border-slate-300 py-3 rounded-lg flex items-center justify-center gap-3 mb-4 font-semibold text-slate-700 hover:bg-slate-50">
+                <i class="fab fa-google text-red-500"></i> Iniciar sesión
             </button>
-            
-            <button onclick="closeModal('login-modal')" class="w-full mt-4 text-slate-400 hover:text-slate-600 text-sm">Usar solo localmente</button>
-            
-            <div class="mt-6 pt-6 border-t border-slate-100 text-xs text-slate-400">
-                ✅ Los datos se guardan de forma privada en tu Drive, nadie tiene acceso a ellos
-            </div>
+            <button id="btn-logout-drive" onclick="window.GoogleDriveSync.logout()" class="hidden w-full bg-red-50 hover:bg-red-100 border border-red-200 py-3 rounded-lg flex items-center justify-center gap-3 mb-4 font-semibold text-red-600 transition-colors">
+                <i class="fas fa-sign-out-alt"></i> Cerrar sesión de Drive
+            </button>
+            <button onclick="closeModal('login-modal')" class="text-sm text-slate-400">Cerrar ventana</button>
         </div>
     </div>
 
-    <script src="app.js"></script>
-    <script src="local-summary.js"></script>
+    <!-- SCRIPTS MODULARES -->
+    <script src="app.js"></script><div style="position: fixed; top: 0px; left: 0px; width: 100%; height: 100%; z-index: 9999; cursor: crosshair; display: none; background: rgba(0, 0, 0, 0.3);"><div style="position: absolute; border: 2px dashed rgb(255, 255, 255); background: rgba(255, 255, 255, 0.1); display: none; pointer-events: none;"></div></div>
+    <script src="ai-original.js"></script>
+    <script src="local-summary.js"></script> 
     <script src="google-drive-sync.js"></script>
-</body>
-</html>
+    <script src="google-drive-ui.js"></script>
+
+
+
+</body></html>
