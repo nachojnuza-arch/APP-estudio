@@ -1,355 +1,1420 @@
 ﻿<!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Apuntes Facultad - Workspace</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Asistente de Escritura Pro</title>
 
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome para íconos -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- html2canvas -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <!-- PDF.js via CDN -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
-    
-    <!-- Google Identity Services OAuth 2.0 -->
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="https://apis.google.com/js/api.js" async defer></script>
+<!-- Enlaces PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f172a">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230f172a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M12 19l7-7 3 3-7 7-3-3z'/><path d='M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z'/><path d='M2 2l7.586 7.586'/><circle cx='11' cy='11' r='2'/></svg>">
+<link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230f172a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M12 19l7-7 3 3-7 7-3-3z'/><path d='M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z'/><path d='M2 2l7.586 7.586'/><circle cx='11' cy='11' r='2'/></svg>">
 
-    <!-- MANIFEST PWA -->
-    <link rel="manifest" href="manifest.json" id="pwa-manifest">
-    <meta name="theme-color" content="#0f172a">
-    <meta name="mobile-web-app-capable" content="yes">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<!-- Librería de Iconos Modernos -->
+<script src="https://unpkg.com/lucide@latest"></script>
 
-    <!-- Estilos de la aplicación -->
-    <link rel="stylesheet" href="app.css">
-    <style>
-        /* Ocultar flechas del input number */
-        input[type=number]::-webkit-inner-spin-button, 
-        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-        input[type=number] { -moz-appearance: textfield; }
-        
-        /* Ajustes de la sidebar: ahora desaparece completamente al cerrarse (ancho 0) */
-        .sidebar { transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); width: 16rem; } /* w-64 = 16rem */
-        .sidebar.collapsed { width: 0 !important; border: none !important; opacity: 0; pointer-events: none; }
-    </style>
+<style>
+  /* --- ESTILOS BASE Y VARIABLES (ACADÉMICO / MODERNO) --- */
+  :root {
+    --bg-main: #f1f5f9;      
+    --bg-panel: #ffffff;     
+    --topbar-bg: #0f172a;    
+    --border: #e2e8f0;       
+    --text-main: #1e293b;    
+    --text-muted: #64748b;   
+    --accent: #2563eb;       
+    --accent-hover: #1d4ed8; 
+    --radius: 8px;           /* Bordes más redondeados */
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
+    --shadow-md: 0 4px 15px rgba(0, 0, 0, 0.05);
+    --transition: 0.2s ease;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body, html {
+    height: 100%;
+    font-family: 'Inter', sans-serif;
+    color: var(--text-main);
+    background: var(--bg-main);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* --- TOPBAR --- */
+  #topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--topbar-bg);
+    color: white;
+    padding: 0.6rem 1.5rem;
+    flex-shrink: 0;
+    box-shadow: var(--shadow-sm);
+    z-index: 20;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: white;
+  }
+
+  .topbar-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .tb-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: 1px solid transparent;
+    color: #cbd5e1; /* Gris claro */
+    padding: 0.35rem 0.6rem;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 500;
+    transition: all var(--transition);
+  }
+
+  /* Resaltado al pasar el ratón */
+  .tb-btn:hover { 
+    background: rgba(255,255,255,0.15); 
+    color: white;
+  }
+  
+  .tb-btn.primary { 
+    background: var(--accent); 
+    color: white; 
+    border-color: var(--accent);
+  }
+  .tb-btn.primary:hover { 
+    background: var(--accent-hover); 
+  }
+  
+  .tb-btn.secondary { 
+    background: rgba(255,255,255,0.1); 
+    border: 1px solid rgba(255,255,255,0.2); 
+    color: white; 
+  } 
+  .tb-btn.secondary:hover { 
+    background: rgba(255,255,255,0.25); 
+  }
+
+  #ai-role-select {
+    background: white;
+    color: var(--text-main);
+    border: 1px solid transparent;
+    padding: 0.35rem 0.6rem;
+    border-radius: var(--radius);
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    outline: none;
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* --- ESTRUCTURA PRINCIPAL --- */
+  #app {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    position: relative;
+  }
+
+  #main-content {
+    display: flex;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* --- PANEL DE CHAT (IZQUIERDA) --- */
+  #chat-container {
+    width: 0;
+    background: var(--bg-panel);
+    display: flex;
+    flex-direction: column;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+    opacity: 0;
+    visibility: hidden;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    box-shadow: 2px 0 10px rgba(0,0,0,0.03);
+    z-index: 10;
+  }
+
+  body.chat-visible #chat-container {
+    width: 35%;
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .chat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.8rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    font-size: 0.85rem;
+    background: #f8fafc;
+  }
+
+  .chat-close {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    padding: 4px;
+    border-radius: 4px;
+    transition: color var(--transition);
+  }
+  .chat-close:hover { color: var(--text-main); background: #e2e8f0; }
+
+  #chat-messages {
+    flex: 1;
+    padding: 1.25rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: var(--bg-panel);
+  }
+
+  .chat-message {
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+    line-height: 1.5;
+    max-width: 90%;
+    white-space: pre-wrap;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .chat-message.system {
+    background: #f1f5f9;
+    color: var(--text-muted);
+    align-self: center;
+    text-align: center;
+    max-width: 100%;
+    font-size: 0.8rem;
+    border: 1px solid var(--border);
+    box-shadow: none;
+  }
+
+  .chat-message.user {
+    background: var(--accent);
+    color: white;
+    align-self: flex-end;
+    border-bottom-right-radius: 2px;
+  }
+
+  .chat-message.model {
+    background: #f8fafc;
+    color: var(--text-main);
+    align-self: flex-start;
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 2px;
+  }
+
+  #chat-form {
+    display: flex;
+    padding: 1rem;
+    background: white;
+    border-top: 1px solid var(--border);
+    gap: 8px;
+  }
+
+  #chat-input {
+    flex: 1;
+    padding: 0.5rem 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    outline: none;
+    font-family: inherit;
+    font-size: 0.85rem;
+    transition: border-color var(--transition);
+  }
+  #chat-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1); }
+
+  #chat-form button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background var(--transition);
+    box-shadow: var(--shadow-sm);
+  }
+  #chat-form button:hover { 
+    background: var(--accent-hover); 
+  }
+
+  /* --- EDITOR (DERECHA) --- */
+  #editor-container {
+    flex: 1; 
+    min-width: 0; 
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-main);
+  }
+
+  #editor-toolbar {
+    background: var(--bg-panel);
+    padding: 0.4rem 1rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    z-index: 5;
+  }
+
+  .toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding-right: 12px;
+    border-right: 1px solid var(--border);
+  }
+  .toolbar-group:last-child { border-right: none; }
+
+  #editor-toolbar button, #editor-toolbar select, #editor-toolbar input[type="color"] {
+    background: transparent;
+    border: 1px solid transparent;
+    padding: 4px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    font-family: inherit;
+    font-size: 0.8rem;
+  }
+
+  #editor-toolbar select { border: 1px solid transparent; padding: 4px 6px; }
+  #editor-toolbar select:hover { border-color: var(--border); background: #f8fafc; }
+  #editor-toolbar input[type="color"] { padding: 0; width: 22px; height: 22px; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+  #editor-toolbar input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+  #editor-toolbar input[type="color"]::-webkit-color-swatch { border: none; }
+  
+  #editor-toolbar button:hover { 
+    background: #f1f5f9; 
+    color: var(--text-main);
+  }
+
+  /* --- ESTILOS DICTADO DE VOZ --- */
+  .recording {
+    color: #ef4444 !important; /* Rojo al grabar */
+    animation: pulse-recording 1.5s infinite;
+  }
+  @keyframes pulse-recording {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+    100% { transform: scale(1); }
+  }
+
+  #page-counter {
+    margin-left: auto;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  #pages-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 3rem 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* DOCUMENTO ÚNICO CONTINUO */
+  #text-editor {
+    background: white;
+    width: 100%;
+    max-width: 800px; 
+    min-height: 1130px; 
+    height: max-content; 
+    flex-shrink: 0; 
+    white-space: pre-wrap; 
+    overflow-wrap: break-word; 
+    word-break: break-word;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 4rem;
+    padding: 80px 70px; 
+    box-sizing: border-box;
+    outline: none;
+    font-family: 'Arial', sans-serif;
+    font-size: 11pt;
+    line-height: 1.6;
+    color: #000;
+    transition: box-shadow var(--transition), border-color var(--transition);
+  }
+
+  #text-editor:focus {
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15), var(--shadow-md);
+    border-color: #93c5fd;
+  }
+
+  #text-editor:empty::before {
+    content: 'Comienza a escribir, dicta por voz o pega tu texto aquí...\n\nTip: Escribe de forma natural. El navegador detectará errores de ortografía automáticamente (subrayado rojo).\nSelecciona una parte del texto y presiona "Corregir" para que la IA la analice sin gastar tu cuota gratuita.';
+    color: #a1a1aa;
+    pointer-events: none;
+  }
+
+  /* ESTILOS PARA LOS ERRORES IA */
+  .ai-suggestion {
+    border-bottom: 2px dashed #8b5cf6; 
+    background-color: rgba(139, 92, 246, 0.05);
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .ai-suggestion:hover { background-color: rgba(139, 92, 246, 0.15); }
+
+  /* CAJA DE SUGERENCIAS FLOTANTE */
+  .suggestion-box {
+    position: absolute;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    z-index: 1000;
+    overflow: hidden;
+    min-width: 200px;
+    max-width: 300px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+  }
+
+  .suggestion-box .sugg-header {
+    background: var(--bg-main);
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .suggestion-box .sugg-item {
+    padding: 10px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--bg-main);
+    color: var(--accent);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.2s;
+  }
+  
+  .suggestion-box .sugg-item:hover { background: #f8fafc; }
+
+  @media (max-width: 768px) {
+    #text-editor { padding: 40px 24px; }
+    body.chat-visible #chat-container { width: 100%; position: absolute; height: 100%; z-index: 50; }
+  }
+
+  /* COMPONENTES AUXILIARES */
+  #loading {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(255,255,255,0.7);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 100;
+  }
+  #loading.show { display: flex; }
+  
+  .spinner {
+    width: 32px; height: 32px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  
+  #loading p { font-size: 0.85rem; font-weight: 500; color: var(--text-main); }
+
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--topbar-bg);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 999;
+    pointer-events: none;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+</style>
 </head>
-<body class="flex h-screen overflow-hidden bg-white text-slate-800">
+<body>
 
-    <!-- Notificaciones Toast -->
-    <div id="toast-container" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-[100] flex flex-col gap-2 pointer-events-none"></div>
+<!-- TOPBAR -->
+<div id="topbar" role="banner">
+  <div class="brand">
+    <i data-lucide="pen-tool" size="18"></i>
+    Asistente de Escritura
+  </div>
+  <div class="topbar-actions">
+    
+    <!-- Selector de Rol IA -->
+    <select id="ai-role-select" title="Selecciona el rol de la IA">
+      <option value="literario">Asistente Literario</option>
+      <option value="profesor">Profesor Universitario</option>
+    </select>
 
-    <!-- BARRA LATERAL (CORREGIDA para no dejar franja azul) -->
-    <aside id="sidebar" class="sidebar bg-slate-900 text-white flex flex-col flex-shrink-0 z-50 absolute md:relative left-0 top-0 bottom-0 overflow-x-hidden h-full shadow-2xl md:shadow-none">
-        <div class="h-14 flex items-center justify-between px-4 border-b border-slate-800 flex-shrink-0">
-            <div class="font-bold tracking-wider text-sm flex items-center gap-2 whitespace-nowrap">
-                <i class="fas fa-graduation-cap text-indigo-400 text-lg"></i> STUDIO
-            </div>
-            <button type="button" onclick="toggleSidebar()" title="Cerrar barra lateral" class="text-slate-400 hover:text-white transition-colors">
-                <i class="fas fa-times"></i>
-            </button>
+    <button id="change-api-key-btn" class="tb-btn" title="Configurar API Key">
+      <i data-lucide="key" size="14"></i> API Key
+    </button>
+    <button id="save-now-btn" class="tb-btn" title="Guardar Progreso">
+      <i data-lucide="save" size="14"></i> Guardar
+    </button>
+    <button id="toggle-chat-btn" class="tb-btn" title="Abrir/Cerrar Chat IA">
+      <i data-lucide="message-square" size="14"></i> Chat
+    </button>
+    
+    <div style="width: 1px; height: 16px; background: rgba(255,255,255,0.2); margin: 0 4px;"></div>
+
+    <!-- BOTONES IA -->
+    <button id="check-errors-btn" class="tb-btn primary" title="Subrayar errores en selección o documento">
+      <i data-lucide="check-circle" size="14"></i> Corregir
+    </button>
+    <button id="check-style-btn" class="tb-btn secondary" title="Analizar el texto según el rol seleccionado">
+      <i data-lucide="sparkles" size="14"></i> Analizar
+    </button>
+    
+    <button id="download-docx-btn" class="tb-btn" title="Descargar Documento">
+      <i data-lucide="download" size="14"></i> Descargar
+    </button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <main id="main-content">
+    
+    <!-- Left Panel: Chat (sidebar) -->
+    <div id="chat-container">
+      <div class="chat-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="bot" size="16"></i> Asistente IA
+        </div>
+        <button id="close-chat-btn" class="chat-close" aria-label="Cerrar chat"><i data-lucide="x" size="16"></i></button>
+      </div>
+      <div id="chat-messages">
+        <div class="chat-message system">
+          Bienvenido.<br><br>Selecciona tu modo en la barra superior (Literario o Profesor).<br><br>Te recomiendo seleccionar con el ratón el párrafo que quieres revisar y luego presionar "Corregir" o "Analizar".
+        </div>
+      </div>
+      <form id="chat-form">
+        <input type="text" id="chat-input" placeholder="Pregúntale algo al asistente..." autocomplete="off">
+        <button type="submit" aria-label="Enviar mensaje"><i data-lucide="send" size="14"></i></button>
+      </form>
+    </div>
+
+    <!-- Right Panel: Editor -->
+    <div id="editor-container">
+      <div id="editor-toolbar">
+        <div class="toolbar-group">
+          <button type="button" id="undo-btn" title="Deshacer"><i data-lucide="undo" size="14"></i></button>
+          <button type="button" id="redo-btn" title="Rehacer"><i data-lucide="redo" size="14"></i></button>
         </div>
 
-        <div class="flex-grow overflow-y-auto overflow-x-hidden p-3">
-            <div class="flex items-center justify-between mb-2 px-2 whitespace-nowrap">
-                <div class="text-[10px] uppercase font-bold text-slate-500">Tus Materias</div>
-                <!-- Indicador de estado de Drive -->
-                <div id="drive-sync-status" class="text-[10px] text-slate-500 cursor-pointer hover:text-white transition-colors" onclick="openModal('login-modal')" title="Sincronización con Drive">
-                    <i class="fas fa-cloud-upload-alt"></i> Local
-                </div>
-            </div>
-            <ul id="subject-list" class="space-y-1 w-full min-w-[14rem]">
-                <!-- Lista de materias y archivos se generará aquí -->
-            </ul>
+        <div class="toolbar-group">
+          <button type="button" id="bold-btn" title="Negrita"><i data-lucide="bold" size="14"></i></button>
+          <button type="button" id="italic-btn" title="Cursiva"><i data-lucide="italic" size="14"></i></button>
+          <button type="button" id="underline-btn" title="Subrayado"><i data-lucide="underline" size="14"></i></button>
         </div>
 
-        <div class="p-3 border-t border-slate-800 flex-shrink-0 space-y-2 whitespace-nowrap">
-            <button onclick="openAddFileModal()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2 shadow-sm">
-                <i class="fas fa-plus"></i> <span>Nuevo Recurso</span>
-            </button>
-            <button onclick="openModal('manage-subjects-modal')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2 shadow-sm">
-                <i class="fas fa-cog"></i> <span>Ajustes</span>
-            </button>
+        <div class="toolbar-group">
+          <button type="button" id="align-left-btn" title="Alinear a la izquierda"><i data-lucide="align-left" size="14"></i></button>
+          <button type="button" id="align-center-btn" title="Centrar texto"><i data-lucide="align-center" size="14"></i></button>
+          <button type="button" id="align-right-btn" title="Alinear a la derecha"><i data-lucide="align-right" size="14"></i></button>
         </div>
-    </aside>
 
-    <!-- ÁREA PRINCIPAL -->
-    <main class="flex-1 flex flex-col min-w-0 bg-white h-full relative">
+        <div class="toolbar-group">
+          <select id="font-family-select" aria-label="Tipo de letra" title="Fuente">
+            <option value="Arial, sans-serif" selected>Arial</option>
+            <option value="'Times New Roman', serif">Times New Roman</option>
+            <option value="'Courier New', monospace">Courier New</option>
+            <option value="'Inter', sans-serif">Inter</option>
+          </select>
+          <input type="color" id="font-color-picker" value="#000000" title="Color de texto">
+          <select id="font-size-select" aria-label="Tamaño de fuente" title="Tamaño">
+            <option value="12px">12</option>
+            <option value="14px" selected>14</option>
+            <option value="16px">16</option>
+            <option value="20px">20</option>
+            <option value="24px">24</option>
+          </select>
+        </div>
+
+        <!-- Grupo de Voz y Sonido -->
+        <div class="toolbar-group">
+          <!-- Botón de lectura existente -->
+          <button type="button" id="read-aloud-btn" title="Leer en voz alta (Reproducir/Pausar)"><i data-lucide="volume-2" size="14"></i></button>
+          <!-- NUEVO BOTÓN: Dictado por Voz -->
+          <button type="button" id="dictation-btn" title="Dictado por voz (Activar/Desactivar)"><i data-lucide="mic" size="14"></i></button>
+        </div>
+
+        <span id="page-counter" aria-live="polite">Aprox. 1 página(s)</span>
+      </div>
+      
+      <div id="pages-container">
+        <!-- Editor Único de Texto con Autocorrección Nativa (autocorrect / autocapitalize) -->
+        <div id="text-editor" contenteditable="true" spellcheck="true" autocorrect="on" autocapitalize="sentences" lang="es"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div id="toast"></div>
+<div id="loading"><div class="spinner"></div><p id="loading-msg">Procesando...</p></div>
+
+<script>
+// --- REGISTRO DEL SERVICE WORKER (Para la PWA) ---
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      console.log('Service Worker registrado con éxito:', reg.scope);
+    }).catch(err => {
+      console.log('Error al registrar Service Worker:', err);
+    });
+  });
+}
+
+// --- Inicializar Iconos ---
+document.addEventListener('DOMContentLoaded', () => {
+  lucide.createIcons();
+});
+
+// --- VARIABLES GLOBALES DEL ESTADO ---
+let geminiApiKey = null;
+let supportedModelName = null;
+let conversationHistory = []; // Solo para el chat conversacional
+let currentEditorText = "";
+
+// Variables para el lector de voz (Simples y directas)
+let isSpeaking = false;
+let currentUtteranceObj = null; 
+let resumeInterval = null; // Timer para evitar que Chrome se cuelgue a los 15s
+
+// --- ELEMENTOS DEL DOM ---
+let textEditor, chatMessages, loadingIndicator, chatForm, chatInput;
+
+document.addEventListener('DOMContentLoaded', () => {
+  chatMessages = document.getElementById('chat-messages');
+  chatForm = document.getElementById('chat-form');
+  chatInput = document.getElementById('chat-input');
+  textEditor = document.getElementById('text-editor');
+  loadingIndicator = document.getElementById('loading');
+  
+  loadSavedText();
+  updatePageCounter();
+  startAutoSave();
+
+  // Inicializar Módulo de Dictado
+  initDictationModule();
+
+  textEditor.addEventListener('input', updatePageCounter);
+
+  // Manejador de clics para Sugerencias IA
+  textEditor.addEventListener('click', (event) => {
+    if (event.target.classList?.contains('ai-suggestion')) {
+      showAISuggestions(event.target);
+    }
+  });
+
+  // UI Toggles
+  const toggleChatBtn = document.getElementById('toggle-chat-btn');
+  const closeChatBtn = document.getElementById('close-chat-btn');
+  if (toggleChatBtn) toggleChatBtn.addEventListener('click', () => document.body.classList.toggle('chat-visible'));
+  if (closeChatBtn) closeChatBtn.addEventListener('click', () => document.body.classList.remove('chat-visible'));
+
+  // Manejador de Cambio de API KEY
+  const changeApiKeyBtn = document.getElementById('change-api-key-btn');
+  if (changeApiKeyBtn) {
+    changeApiKeyBtn.addEventListener('click', () => {
+      const currentKey = localStorage.getItem('gemini_api_key') || '';
+      const newKey = prompt('Introduce tu clave API de Google AI Studio:', currentKey);
+      if (newKey !== null && newKey.trim() !== '') {
+        localStorage.setItem('gemini_api_key', newKey.trim());
+        geminiApiKey = newKey.trim();
+        showToast('✅ API Key actualizada');
+      }
+    });
+  }
+
+  // Toolbar actions
+  const btn = (id, fn) => document.getElementById(id)?.addEventListener('click', fn);
+  
+  btn('undo-btn', () => { document.execCommand('undo', false, null); textEditor.focus(); });
+  btn('redo-btn', () => { document.execCommand('redo', false, null); textEditor.focus(); });
+  btn('bold-btn', () => applyTextStyle('bold'));
+  btn('italic-btn', () => applyTextStyle('italic'));
+  btn('underline-btn', () => applyTextStyle('underline'));
+  btn('align-left-btn', () => applyTextAlignment('justifyLeft'));
+  btn('align-center-btn', () => applyTextAlignment('justifyCenter'));
+  btn('align-right-btn', () => applyTextAlignment('justifyRight'));
+
+  // Evitar pérdida de foco
+  document.querySelectorAll('#editor-toolbar button').forEach(el => {
+    el.addEventListener('mousedown', (event) => event.preventDefault());
+  });
+
+  document.getElementById('font-family-select')?.addEventListener('change', (e) => {
+    if (e.target.value) { applyTextFamily(e.target.value); textEditor.focus(); }
+  });
+  document.getElementById('font-color-picker')?.addEventListener('input', (e) => applyTextColor(e.target.value));
+  document.getElementById('font-size-select')?.addEventListener('change', (e) => {
+    if (e.target.value) { applyTextSize(e.target.value); textEditor.focus(); }
+  });
+
+  // Acciones principales AI
+  btn('check-errors-btn', handleSmartCorrection);
+  btn('check-style-btn', handleLiteraryAnalysis);
+  
+  btn('save-now-btn', () => saveContent(true));
+  btn('download-docx-btn', downloadAsDocx);
+
+  if (chatForm) chatForm.addEventListener('submit', handleChatMessage);
+
+  // Atajos de Teclado
+  document.addEventListener('keydown', (event) => {
+    if (!event.ctrlKey && !event.metaKey) return;
+    if (event.altKey) return;
+    switch (event.key.toLowerCase()) {
+      case 'b': event.preventDefault(); applyTextStyle('bold'); break;
+      case 'i': event.preventDefault(); applyTextStyle('italic'); break;
+      case 'u': event.preventDefault(); applyTextStyle('underline'); break;
+      case 'z': event.preventDefault(); document.execCommand('undo', false, null); break;
+      case 'y': event.preventDefault(); document.execCommand('redo', false, null); break;
+    }
+  });
+  
+  // Vincular botón de lectura
+  btn('read-aloud-btn', toggleReadAloud);
+});
+
+// --- MÓDULO DE DICTADO DE VOZ CON ESCRITURA EN VIVO (CORREGIDO) ---
+function initDictationModule() {
+  const dictationBtn = document.getElementById('dictation-btn');
+  if (!dictationBtn) return;
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  
+  if (!SpeechRecognition) {
+    dictationBtn.style.display = 'none'; 
+    console.warn("API de dictado por voz no soportada en este navegador.");
+    return;
+  }
+
+  let recognition = new SpeechRecognition();
+  let isRecording = false;
+  let interimSpan = null; 
+  let dictationPauseTimer = null;
+
+  recognition.continuous = true; 
+  recognition.interimResults = true; 
+  recognition.lang = 'es-ES'; 
+
+  recognition.onstart = () => {
+    isRecording = true;
+    dictationBtn.classList.add('recording');
+    showToast("Micrófono activado. Habla ahora...");
+  };
+
+  recognition.onresult = (event) => {
+    let finalTranscript = '';
+    let interimTranscript = '';
+
+    for (let i = event.resultIndex; i < event.results.length; ++i) {
+      if (event.results[i].isFinal) {
+        finalTranscript += event.results[i][0].transcript;
+      } else {
+        interimTranscript += event.results[i][0].transcript;
+      }
+    }
+
+    // Detener temporizador de auto-puntuación mientras hablamos
+    clearTimeout(dictationPauseTimer);
+
+    textEditor.focus();
+
+    // 1. ELIMINACIÓN SEGURA DEL TEXTO EN VIVO: 
+    // Lo borramos usando el DOM para garantizar que no se quede pegado y nos duplique el texto
+    if (interimSpan) {
+      if (interimSpan.parentNode) {
+        // Restaurar cursor exactamente a donde estaba antes del span gris
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.setStartBefore(interimSpan);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
         
-        <!-- Topbar -->
-        <header class="h-14 border-b border-slate-200 px-4 flex items-center justify-between bg-white z-30 shadow-sm flex-shrink-0 w-full">
-            <div class="flex items-center gap-3 truncate">
-                <!-- NUEVO: Botón para abrir la sidebar si está cerrada -->
-                <button onclick="toggleSidebar()" class="text-slate-500 hover:text-indigo-600 transition-colors p-1" title="Abrir Menú">
-                    <i class="fas fa-bars"></i>
-                </button>
-                <div class="w-px h-6 bg-slate-200 mx-1"></div>
-                <i id="header-icon" class="fas fa-book-open text-slate-400"></i>
-                <h1 id="header-title" class="font-semibold text-slate-700 truncate text-sm">Bienvenido</h1>
-            </div>
-            <div class="flex items-center gap-2">
-                <button onclick="saveData(true)" class="text-emerald-600 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 p-2 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium shadow-sm" title="Sincronizar cambios">
-                    <i class="fas fa-sync-alt"></i> <span class="hidden sm:inline">Guardar</span>
-                </button>
-                <button onclick="toggleReadingFilter()" class="text-slate-400 hover:text-indigo-500 p-2 rounded-lg transition-colors" title="Filtro de lectura" id="reading-filter-btn">
-                    <i class="fas fa-eye"></i>
-                </button>
-                <button onclick="clearAllData()" class="text-slate-400 hover:text-red-500 p-2 rounded-lg transition-colors" title="Borrar todos los datos">
-                    <i class="fas fa-trash-alt"></i>
-                </button>
-                <button onclick="toggleNotesPanel()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 p-2 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium">
-                    <i class="fas fa-columns"></i> <span class="hidden sm:inline">Panel Notas</span>
-                </button>
-            </div>
-        </header>
+        // Eliminar el nodo de forma segura
+        interimSpan.remove();
+      }
+      interimSpan = null;
+    }
 
-        <!-- Contenido de Trabajo (Split View) -->
-        <div class="flex-1 flex overflow-hidden relative">
+    // 2. TEXTO FINAL: Se inserta formalmente
+    if (finalTranscript) {
+      let formattedText = formatDictationTranscript(finalTranscript);
+      document.execCommand('insertText', false, formattedText);
+      
+      updatePageCounter();
+      saveContent(false);
 
-            <!-- Visor Izquierdo (Media) -->
-            <div id="media-viewer" class="flex-1 bg-slate-100 relative overflow-auto flex justify-center items-start panel-transition h-full w-full">
+      // AUTO-PUNTUACIÓN POR PAUSAS (2 SEGUNDOS DE SILENCIO = PUNTO Y SEGUIDO)
+      dictationPauseTimer = setTimeout(() => {
+        if (isRecording) {
+          const currentText = textEditor.innerText.trim();
+          if (currentText.length > 0 && !/[.,;:?!]$/.test(currentText)) {
+            textEditor.focus();
+            document.execCommand('insertText', false, '. ');
+            saveContent(false);
+          }
+        }
+      }, 2000);
+    }
 
-                <!-- Estado Vacío -->
-                <div id="empty-state" class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 z-10 m-auto h-full w-full pointer-events-none">
-                    <div class="w-20 h-20 bg-white rounded-2xl shadow-sm border border-slate-200 flex items-center justify-center mb-4">
-                        <i id="empty-state-icon" class="fas fa-folder-open text-3xl text-indigo-300"></i>
-                    </div>
-                    <p id="empty-state-title" class="font-medium text-slate-600">Ningún archivo seleccionado</p>
-                    <p id="empty-state-desc" class="text-xs mt-1">Añade un PDF o Video desde el panel izquierdo.</p>
-                </div>
+    // 3. NUEVO TEXTO EN VIVO: Se inserta y se le obliga a tener estilos en línea
+    if (interimTranscript) {
+      interimSpan = document.createElement('span');
+      // Aseguramos estilos en línea por si el editor contenteditable los borra
+      interimSpan.style.color = '#94a3b8';
+      interimSpan.style.fontStyle = 'italic';
+      interimSpan.style.borderBottom = '1px dashed #cbd5e1';
+      interimSpan.style.pointerEvents = 'none';
+      interimSpan.textContent = interimTranscript + "...";
+      
+      const sel = window.getSelection();
+      if (sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        range.insertNode(interimSpan);
+        
+        // Mover cursor a la derecha del span para que parezca que avanza
+        const newRange = document.createRange();
+        newRange.setStartAfter(interimSpan);
+        newRange.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+      }
+    }
+  };
 
-                <!-- Contenedores multimedia -->
-                <canvas id="pdf-canvas" class="hidden my-6 shadow-xl border border-slate-200 rounded relative z-20"></canvas>
-                <div id="video-container" class="hidden w-full h-full bg-black relative z-20"></div>
+  recognition.onerror = (event) => {
+    console.error("Error en dictado:", event.error);
+    if (event.error !== 'no-speech') {
+      showToast("Error de micrófono: " + event.error);
+      stopDictation();
+    }
+  };
 
-                <!-- Controles PDF Flotantes -->
-                <div id="pdf-controls" class="hidden fixed bottom-6 left-1/2 transform -translate-x-1/2 glass-panel shadow-lg border border-slate-200 rounded-full px-4 py-2 flex items-center gap-3 text-sm z-30 bg-white/90 backdrop-blur-sm">
-                    <button type="button" onclick="changePage(-1)" title="Página anterior" class="text-slate-600 hover:text-indigo-600 px-2"><i class="fas fa-chevron-left"></i></button>
-                    
-                    <div class="flex items-center gap-1">
-                        <input type="number" id="page-input" class="w-12 h-7 text-center text-sm font-medium border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none text-slate-700 bg-white" value="1" min="1" onchange="goToPage(this.value)" onkeydown="if(event.key === 'Enter') goToPage(this.value)">
-                        <span class="text-sm text-slate-500 font-medium whitespace-nowrap">de <span id="page-total">1</span></span>
-                    </div>
+  recognition.onend = () => {
+    clearTimeout(dictationPauseTimer);
+    if (interimSpan && interimSpan.parentNode) {
+      interimSpan.remove();
+      interimSpan = null;
+    }
 
-                    <button type="button" onclick="changePage(1)" title="Página siguiente" class="text-slate-600 hover:text-indigo-600 px-2"><i class="fas fa-chevron-right"></i></button>
-                    
-                    <div class="hidden sm:block w-px h-4 bg-slate-300 mx-1"></div>
-                    
-                    <button type="button" onclick="changeZoom(-0.2)" title="Disminuir zoom" class="hidden sm:block text-slate-600 hover:text-indigo-600 px-1"><i class="fas fa-search-minus"></i></button>
-                    <span id="zoom-info" class="hidden sm:inline-block text-xs text-slate-500 w-10 text-center font-medium">100%</span>
-                    <button type="button" onclick="changeZoom(0.2)" title="Aumentar zoom" class="hidden sm:block text-slate-600 hover:text-indigo-600 px-1"><i class="fas fa-search-plus"></i></button>
-                </div>
-            </div>
+    if (isRecording) {
+      try { recognition.start(); } catch (e) { stopDictation(); }
+    } else {
+      stopDictation();
+    }
+  };
 
-            <!-- Panel Derecho (Notas e IA) -->
-            <div id="notes-panel" class="hidden md:flex absolute md:relative right-0 top-0 bottom-0 w-full md:w-[450px] max-w-full md:border-l border-slate-200 bg-white flex-col flex-shrink-0 panel-transition z-40 md:z-20 h-full shadow-2xl md:shadow-none">
-                <!-- Pestañas -->
-                <div class="flex border-b border-slate-200 bg-slate-50 p-1 gap-1 flex-shrink-0 relative">
-                    <button onclick="toggleNotesPanel()" class="md:hidden absolute right-2 top-2 text-slate-400 hover:text-slate-600 p-1 z-10" title="Cerrar Panel">
-                        <i class="fas fa-times"></i>
-                    </button>
-                    <button onclick="switchTab('notes')" id="tab-btn-notes" class="flex-1 py-2 text-sm font-semibold rounded-md bg-white shadow-sm text-indigo-600 transition-all">
-                        <i class="fas fa-pen-nib mr-1"></i> Apuntes
-                    </button>
-                    <button onclick="switchTab('ai')" id="tab-btn-ai" class="flex-1 py-2 text-sm font-semibold rounded-md text-slate-500 hover:bg-slate-200/50 transition-all">
-                        <i class="fas fa-robot mr-1"></i> IA Assistant
-                    </button>
-                </div>
+  function stopDictation() {
+    isRecording = false;
+    clearTimeout(dictationPauseTimer);
+    try { recognition.stop(); } catch(e) {}
+    dictationBtn.classList.remove('recording');
+    showToast("Dictado por voz pausado.");
+    
+    if (interimSpan && interimSpan.parentNode) {
+      interimSpan.remove();
+      interimSpan = null;
+    }
+  }
 
-                <!-- Contenido Pestaña Notas -->
-                <div id="tab-content-notes" class="flex-1 flex flex-col overflow-hidden">
-                    <div class="border-b border-slate-100 p-2 flex items-center justify-between bg-white flex-shrink-0">
-                        <div class="flex gap-1">
-                            <button type="button" title="Negrita" onclick="document.execCommand('bold', false, null)" class="w-8 h-8 rounded hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-bold"></i></button>
-                            <button type="button" title="Cursiva" onclick="document.execCommand('italic', false, null)" class="w-8 h-8 rounded hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-italic"></i></button>
-                            <button type="button" title="Lista" onclick="document.execCommand('insertUnorderedList', false, null)" class="w-8 h-8 rounded hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-list-ul"></i></button>
-                        </div>
-                        <div class="flex items-center gap-3">
-                            <span id="save-status" class="text-xs text-slate-400"><i class="fas fa-check text-green-500"></i> Guardado</span>
-                            <button type="button" title="Exportar notas" onclick="exportNotesAsDocx()" class="text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded transition-colors flex items-center gap-1">
-                                <i class="fas fa-file-word"></i> Exportar
-                            </button>
-                        </div>
-                    </div>
-                    <div id="notes-editor" contenteditable="true" class="flex-1 p-5 overflow-y-auto focus:outline-none" data-placeholder="Comienza a escribir tus apuntes aquí..."></div>
-                </div>
+  dictationBtn.addEventListener('click', () => {
+    if (isRecording) {
+      isRecording = false; 
+      stopDictation();
+    } else {
+      try {
+        recognition.start();
+      } catch(e) {
+        console.error("Error al iniciar micrófono:", e);
+        showToast("Por favor otorga permisos de micrófono al navegador.");
+      }
+    }
+  });
+}
 
-                <!-- Contenido Pestaña IA -->
-                <div id="tab-content-ai" class="hidden flex-1 flex flex-col overflow-hidden bg-slate-50">
-                    <div class="p-4 border-b border-slate-200 bg-white flex justify-between items-center flex-shrink-0">
-                        <label class="block text-xs font-bold text-slate-500 uppercase">Acciones Rápidas</label>
-                        <button onclick="openModal('api-modal')" class="text-slate-400 hover:text-indigo-600 transition-colors text-sm" title="Configurar API Key">
-                            <i class="fas fa-cog"></i> API
-                        </button>
-                    </div>
-                    <div class="p-4 border-b border-slate-200 bg-white flex-shrink-0">
-                        <button onclick="generarResumenDirecto()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2.5 px-3 rounded shadow-sm transition-colors flex justify-center items-center gap-2 mb-2">
-                            <i class="fas fa-file-alt"></i> Resumen Local (sin IA)
-                        </button>
-                        <button onclick="summarizeWithAI()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2.5 px-3 rounded shadow-sm transition-colors flex justify-center items-center gap-2 mb-2">
-                            <i class="fas fa-robot"></i> Resumen con IA
-                        </button>
-                        <button onclick="generateQuiz()" class="w-full bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold py-2 px-3 rounded shadow-sm transition-colors flex justify-center items-center gap-2">
-                            <i class="fas fa-question-circle"></i> Quiz IA
-                        </button>
-                    </div>
-                    
-                    <!-- RESTAURADO: Sector de Fuentes IA -->
-                    <div class="px-4 py-2 border-b border-slate-200 bg-slate-50 flex-shrink-0">
-                        <div class="flex items-center justify-between mb-1">
-                            <label class="text-[10px] font-bold text-slate-400 uppercase">📚 Fuentes IA</label>
-                            <span id="ai-source-count" class="text-[10px] text-indigo-500 font-medium">0 seleccionadas</span>
-                        </div>
-                        <div id="ai-sources-list" class="max-h-28 overflow-y-auto space-y-0.5">
-                            <p class="text-xs text-slate-400 italic p-1">Cargando fuentes...</p>
-                        </div>
-                    </div>
+function formatDictationTranscript(transcript) {
+  let t = transcript.trim();
+  
+  const replacements = [
+      { regex: /\s+coma\b/gi, val: ',' },
+      { regex: /\s+punto y coma\b/gi, val: ';' },
+      { regex: /\s+punto\b/gi, val: '.' },
+      { regex: /\s+dos puntos\b/gi, val: ':' },
+      { regex: /\s+nueva l[ií]nea\b/gi, val: '\n' },
+      { regex: /\s+signo de interrogaci[óo]n\b/gi, val: '?' },
+      { regex: /\s+signo de exclamaci[óo]n\b/gi, val: '!' }
+  ];
+  replacements.forEach(r => {
+      t = t.replace(r.regex, r.val);
+  });
 
-                    <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
-                        <div class="msg-ai p-3 text-sm shadow-sm bg-white border border-slate-200 rounded-xl rounded-tl-none">
-                            ¡Hola! Soy tu asistente de estudio. Selecciona una acción rápida arriba para resumir tus notas actuales.
-                        </div>
-                    </div>
-                    <div id="typing-indicator" class="hidden p-4 flex gap-1 items-center bg-slate-50 border-t border-slate-200">
-                        <span class="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></span>
-                        <span class="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></span>
-                        <span class="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 0.4s"></span>
-                        <span class="text-xs text-slate-500 ml-2">IA escribiendo...</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </main>
+  t = t.replace(/\s+([.,;:?!])/g, '$1');
 
-    <!-- Loading indicator -->
-    <div id="loading" class="hidden fixed inset-0 bg-black/50 z-[100] flex items-center justify-center">
-        <div class="bg-white rounded-xl p-5 flex items-center gap-3 shadow-2xl">
-            <i class="fas fa-spinner fa-spin text-indigo-600 text-xl"></i>
-            <span id="loading-msg" class="text-slate-700 font-medium text-sm">Procesando...</span>
-        </div>
+  // Capitalización Inteligente
+  const editorText = textEditor.innerText.trim();
+  const lastChar = editorText.slice(-1);
+  const needsCapitalization = editorText === "" || ['.', '!', '?', '\n'].includes(lastChar);
+
+  if (t.length > 0 && needsCapitalization) {
+      t = t.charAt(0).toUpperCase() + t.slice(1);
+  }
+  
+  return t + (t.endsWith('\n') ? '' : ' ');
+}
+// --- FIN DEL MÓDULO DE DICTADO DE VOZ ---
+
+// --- LECTOR EN VOZ ALTA ---
+function toggleReadAloud() {
+  if (isSpeaking || window.speechSynthesis.speaking) {
+    window.speechSynthesis.cancel();
+    clearInterval(resumeInterval);
+    isSpeaking = false;
+    document.getElementById('read-aloud-btn').innerHTML = '<i data-lucide="volume-2" size="14"></i>';
+    lucide.createIcons();
+    showToast("Lectura detenida");
+    return;
+  }
+
+  let textToRead = "";
+  const selectedText = window.getSelection().toString().trim();
+
+  if (selectedText.length > 0) {
+    textToRead = selectedText;
+    showToast("Leyendo selección...");
+  } else {
+    textToRead = textEditor.innerText.trim();
+    showToast("Leyendo todo el documento...");
+  }
+
+  if (!textToRead) {
+    showToast("No hay texto para leer.");
+    return;
+  }
+
+  window.speechSynthesis.cancel();
+  
+  setTimeout(() => {
+    currentUtteranceObj = new SpeechSynthesisUtterance(textToRead);
+    currentUtteranceObj.lang = 'es-ES';
+    currentUtteranceObj.rate = 1.0;
+    currentUtteranceObj.volume = 1.0;
+    
+    const voices = window.speechSynthesis.getVoices();
+    const spanishVoice = voices.find(v => v.lang.includes('es'));
+    if (spanishVoice) {
+      currentUtteranceObj.voice = spanishVoice;
+    }
+
+    currentUtteranceObj.onstart = () => {
+      isSpeaking = true;
+      document.getElementById('read-aloud-btn').innerHTML = '<i data-lucide="square" size="14"></i>';
+      lucide.createIcons();
+      
+      clearInterval(resumeInterval);
+      resumeInterval = setInterval(() => {
+         if (window.speechSynthesis.speaking) {
+             window.speechSynthesis.resume();
+         }
+      }, 10000);
+    };
+
+    currentUtteranceObj.onend = () => {
+      isSpeaking = false;
+      clearInterval(resumeInterval);
+      document.getElementById('read-aloud-btn').innerHTML = '<i data-lucide="volume-2" size="14"></i>';
+      lucide.createIcons();
+    };
+
+    currentUtteranceObj.onerror = (e) => {
+      console.warn("Error o interrupción del TTS:", e);
+      isSpeaking = false;
+      clearInterval(resumeInterval);
+      document.getElementById('read-aloud-btn').innerHTML = '<i data-lucide="volume-2" size="14"></i>';
+      lucide.createIcons();
+    };
+
+    window.speechSynthesis.speak(currentUtteranceObj);
+  }, 100); 
+}
+
+// --- OBTENER TEXTO A ANALIZAR ---
+function getTargetText() {
+  const selection = window.getSelection();
+  const selectedText = selection.toString().trim();
+  
+  if (selectedText.length > 10) {
+    return { text: selectedText, isSelection: true };
+  }
+  return { text: textEditor.innerText, isSelection: false };
+}
+
+// --- FUNCIÓN 1: CORRECCIÓN ESTRUCTURAL (JSON) ---
+async function handleSmartCorrection() {
+  const target = getTargetText();
+  if (!target.text.trim()) {
+    showToast("Escribe o selecciona texto para analizar.");
+    return;
+  }
+  
+  document.body.classList.add('chat-visible');
+
+  const smartPrompt = `Actúa como corrector de estilo avanzado.
+Analiza el siguiente texto y devuelve ÚNICAMENTE un objeto JSON válido.
+Estructura estricta obligatoria:
+{
+  "comentario_general": "Resumen muy breve (1 línea).",
+  "correcciones": [
+    {
+      "original": "palabra o frase exacta del documento con error",
+      "sugerencia": "tu corrección",
+      "explicacion": "Razón corta"
+    }
+  ]
+}
+Deja el array vacío si está perfecto. No devuelvas NADA MÁS que el JSON.
+Texto a analizar ${target.isSelection ? "(Fragmento seleccionado)" : "(Documento completo)"}:
+---
+${target.text}
+---`;
+
+  const tempHistory = [{ role: 'user', parts: [{ text: smartPrompt }] }];
+  
+  const apiKey = await getApiKey();
+  if (!apiKey) return;
+
+  showLoading(`Analizando ${target.isSelection ? "selección" : "todo el documento"}...`);
+  
+  try {
+    let result = await callGoogleAI(tempHistory, apiKey);
+    
+    let cleanedResult = result.replace(/```json/gi, '').replace(/```/g, '').trim();
+    
+    let analysisData;
+    try {
+      analysisData = JSON.parse(cleanedResult);
+    } catch (e) {
+      console.error("Error al parsear JSON:", e, cleanedResult);
+      addMessageToChat("Hubo un problema estructurando las correcciones. Intenta de nuevo.", 'system');
+      hideLoading();
+      return;
+    }
+
+    if (analysisData.comentario_general) {
+      addMessageToChat(`📝 ${analysisData.comentario_general}`, 'model');
+    }
+
+    if (analysisData.correcciones && analysisData.correcciones.length > 0) {
+      applyAIHighlights(analysisData.correcciones);
+      showToast(`${analysisData.correcciones.length} sugerencias aplicadas en el editor.`);
+      if(target.isSelection) addMessageToChat(`He subrayado en púrpura ${analysisData.correcciones.length} sugerencias en la parte que seleccionaste. Haz clic en ellas para revisarlas.`, 'system');
+      else addMessageToChat(`He subrayado en púrpura ${analysisData.correcciones.length} sugerencias en todo el texto. Haz clic en ellas.`, 'system');
+    } else {
+      addMessageToChat("¡El texto que revisé está excelente! No veo necesidad de cambios gramaticales.", 'model');
+    }
+
+  } catch (error) {
+    addMessageToChat(`Error: ${error.message}`, 'system');
+  } finally {
+    hideLoading();
+  }
+}
+
+// --- FUNCIÓN 2: CRÍTICA LITERARIA ---
+async function handleLiteraryAnalysis() {
+  const target = getTargetText();
+  if (!target.text.trim()) {
+    showToast("Escribe algo de texto para analizar.");
+    return;
+  }
+
+  document.body.classList.add('chat-visible');
+
+  const selectedRole = document.getElementById('ai-role-select').value;
+  let personaPrompt = "";
+
+  if (selectedRole === 'literario') {
+    personaPrompt = `Actúa como un Asistente Literario divertido, irónico pero muy amable.
+    Reglas de formato: No uses markdown. Separa párrafos con una línea en blanco.
+    Analiza el texto, marca errores gramaticales o de redacción, explica cómo corregirlos y da sugerencias concretas de estilo y narrativa para mejorar la estructura.
+    IMPORTANTE: Siempre incluye algún chiste sutil y amigable sobre "pelados" (calvos) en tu crítica, como un guiño de humor recurrente, pero mantén la ayuda literaria útil y enfocada.
+    
+    Texto a analizar ${target.isSelection ? "(Fragmento)" : "(Completo)"}:
+    ---
+    ${target.text}
+    ---`;
+  } else {
+    personaPrompt = `Actúa como un Docente Universitario experto en Bioquímica y Medicina.
+    Reglas de formato: No uses markdown. Separa párrafos con una línea en blanco.
+    Analiza el siguiente texto o ejercicio. Detecta errores conceptuales, explica la resolución paso a paso con rigor científico, didáctica clara y nivel universitario.
+    
+    Texto o ejercicio a analizar ${target.isSelection ? "(Fragmento)" : "(Completo)"}:
+    ---
+    ${target.text}
+    ---`;
+  }
+
+  conversationHistory.push({ role: 'user', parts: [{ text: personaPrompt }] });
+  
+  const apiKey = await getApiKey();
+  if (!apiKey) return;
+
+  showLoading("Analizando contenido...");
+  
+  try {
+    let result = await callGoogleAI(conversationHistory, apiKey);
+    result = result.replace(/[*#_]/g, ''); 
+    conversationHistory.push({ role: 'model', parts: [{ text: result }] });
+    addMessageToChat(result, 'model');
+  } catch (error) {
+    addMessageToChat(`Error: ${error.message}`, 'system');
+    conversationHistory.pop(); 
+  } finally {
+    hideLoading();
+  }
+}
+
+// --- MANEJO DE HIGHLIGHTS IA EN EL EDITOR ---
+function applyAIHighlights(correcciones) {
+  let html = textEditor.innerHTML;
+  
+  correcciones.forEach(c => {
+    if (c.original && c.sugerencia && c.original.length > 2) {
+      const escapedOriginal = c.original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`(?![^<]*>)(${escapedOriginal})`, "g");
+      
+      const safeSug = escapeHtml(c.sugerencia);
+      const safeExp = escapeHtml(c.explicacion);
+      
+      html = html.replace(regex, `<span class="ai-suggestion" data-sug="${safeSug}" data-exp="${safeExp}">$1</span>`);
+    }
+  });
+
+  textEditor.innerHTML = html;
+}
+
+function showAISuggestions(el) {
+  const sug = el.getAttribute('data-sug');
+  const exp = el.getAttribute('data-exp');
+  
+  if (!sug) return;
+  
+  const box = document.createElement('div');
+  box.className = 'suggestion-box';
+  box.innerHTML = `
+    <div class="sugg-header">${exp || 'Sugerencia de mejora'}</div>
+    <div class="sugg-item" title="Aplicar reemplazo">
+      <span style="color: var(--text-muted); font-size: 12px; margin-right: 4px;">Reemplazar por:</span> 
+      <strong>${sug}</strong>
     </div>
+  `;
+  
+  const rect = el.getBoundingClientRect();
+  box.style.top = `${rect.bottom + window.scrollY + 5}px`; 
+  box.style.left = `${rect.left + window.scrollX}px`;
+  
+  document.querySelectorAll('.suggestion-box').forEach(b => b.remove());
+  document.body.appendChild(box);
+  
+  box.querySelector('.sugg-item').addEventListener('click', () => {
+    const textNode = document.createTextNode(sug);
+    el.parentNode.replaceChild(textNode, el);
+    saveContent();
+    box.remove();
+    showToast("Cambio aplicado");
+  });
+  
+  setTimeout(() => document.addEventListener('click', function close(e) {
+    if (!box.contains(e.target)) { box.remove(); document.removeEventListener('click', close); }
+  }), 100);
+}
 
-    <!-- Pantalla completa para resultados de IA -->
-    <div id="ai-fullscreen" class="hidden fixed inset-0 bg-white z-[200] flex flex-col">
-        <div class="flex items-center justify-between px-4 py-2 border-b border-slate-200 bg-slate-50 flex-shrink-0">
-            <div class="flex items-center gap-2">
-                <i class="fas fa-file-alt text-indigo-600"></i>
-                <span id="ai-fullscreen-title" class="font-semibold text-slate-700 text-sm">Resultado</span>
-            </div>
-            <div class="flex items-center gap-2">
-                <button id="ai-edit-btn" onclick="toggleEditAIResult()" class="text-xs bg-slate-600 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
-                    <i class="fas fa-edit"></i> Editar
-                </button>
-                <button onclick="downloadAIResult()" class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
-                    <i class="fas fa-download"></i> Descargar DOC
-                </button>
-                <button onclick="closeAIFullscreen()" class="text-xs bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
-                    <i class="fas fa-times"></i> Cerrar
-                </button>
-            </div>
-        </div>
-        <div id="ai-fullscreen-content" contenteditable="true" class="flex-1 overflow-y-auto p-6 text-sm text-slate-700 leading-relaxed prose prose-slate max-w-none focus:outline-none" style="max-width: 900px; margin: 0 auto; width: 100%;">
-        </div>
-        <div id="ai-fullscreen-footer" class="flex-shrink-0 border-t border-slate-200 bg-slate-50 px-4 py-1.5 flex items-center justify-between text-[10px] text-slate-400">
-            <span id="ai-fullscreen-time">Generando...</span>
-            <span>✅ Listo</span>
-        </div>
-    </div>
 
-    <!-- MODAL: Gestionar Materias -->
-    <div id="manage-subjects-modal" class="fixed inset-0 bg-black/50 hidden z-50 flex justify-center items-center">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
-            <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-                <h3 class="text-lg font-bold text-slate-800">Gestionar Materias</h3>
-                <button type="button" onclick="closeModal('manage-subjects-modal')" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
-            </div>
-            <div class="p-6 space-y-4">
-                <div class="flex gap-2">
-                    <input type="text" id="new-subject-name" class="flex-grow border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Nombre de la nueva materia...">
-                    <button onclick="addSubject()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Añadir</button>
-                </div>
-                <div class="max-h-60 overflow-y-auto border border-slate-200 rounded-lg">
-                    <ul id="modal-subject-list" class="divide-y divide-slate-100"></ul>
-                </div>
-            </div>
-        </div>
-    </div>
+// --- CHAT TRADICIONAL ---
+async function handleChatMessage(e) {
+  e.preventDefault();
+  if (!chatInput || !chatInput.value.trim()) return;
+  const userMessage = chatInput.value.trim();
+  addMessageToChat(userMessage, 'user');
+  
+  if (conversationHistory.length > 10) {
+     conversationHistory.splice(1, 2);
+  }
 
-    <!-- MODAL: Añadir Archivo -->
-    <div id="add-file-modal" class="fixed inset-0 bg-black/50 hidden z-50 flex justify-center items-center">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
-            <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-                <h3 class="text-lg font-bold text-slate-800">Añadir Recurso</h3>
-                <button type="button" onclick="closeModal('add-file-modal')" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
-            </div>
-            <div class="p-6 space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Materia Destino</label>
-                    <select id="file-target-subject" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none bg-slate-50"></select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Tipo de Archivo</label>
-                    <select id="file-type" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none" onchange="document.getElementById('input-local').classList.toggle('hidden', this.value !== 'pdf_local'); document.getElementById('input-url').classList.toggle('hidden', this.value === 'pdf_local');">
-                        <option value="pdf_local">PDF desde mi dispositivo</option>
-                        <option value="pdf_url">Enlace Web</option>
-                        <option value="video">Video Externo</option>
-                    </select>
-                </div>
-                <div id="input-local">
-                    <input type="file" id="file-upload" accept="application/pdf" class="w-full text-sm text-slate-500 border border-slate-200 rounded-lg p-1">
-                </div>
-                <div id="input-url" class="hidden">
-                    <input type="url" id="file-url" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none" placeholder="https://...">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Nombre (Opcional si es PDF)</label>
-                    <input type="text" id="file-name" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none" placeholder="Si lo dejas vacío, usará el nombre del archivo">
-                </div>
-            </div>
-            <div class="bg-slate-50 px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-                <button onclick="closeModal('add-file-modal')" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">Cancelar</button>
-                <button onclick="confirmAddFile()" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors">Guardar</button>
-            </div>
-        </div>
-    </div>
+  if (conversationHistory.length === 0) {
+    const selectedRole = document.getElementById('ai-role-select').value;
+    let rolePrompt = selectedRole === 'literario' 
+      ? "Actúa como un asistente literario divertido, irónico y amable. Haz siempre algún chiste simpático sobre pelados (calvos). Responde a: "
+      : "Actúa como un profesor universitario riguroso y didáctico, experto en Bioquímica y Medicina. Responde a: ";
+    
+    conversationHistory = [{ role: 'user', parts: [{ text: rolePrompt + userMessage }] }];
+  } else {
+    conversationHistory.push({ role: 'user', parts: [{ text: userMessage }] });
+  }
+  
+  chatInput.value = '';
+  
+  const apiKey = await getApiKey();
+  if (!apiKey) return;
+  
+  showLoading("Procesando...");
+  try {
+    let result = await callGoogleAI(conversationHistory, apiKey);
+    result = result.replace(/[*#_]/g, ''); 
+    conversationHistory.push({ role: 'model', parts: [{ text: result }] });
+    addMessageToChat(result, 'model');
+  } catch (error) {
+    addMessageToChat(`Error: ${error.message}`, 'system');
+    conversationHistory.pop();
+  } finally {
+    hideLoading();
+  }
+}
 
-    <!-- MODAL: Configurar API Key -->
-    <div id="api-modal" class="fixed inset-0 bg-black/50 hidden z-50 flex justify-center items-center">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden p-6 text-center">
-            <h3 class="text-lg font-bold text-slate-800 mb-2">Configuración IA</h3>
-            <p class="text-sm text-slate-500 mb-6">Ingresa tu API Key de Google Gemini.</p>
-            <input type="password" id="api-key-input" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-4 text-center outline-none">
-            <button onclick="saveApiKey()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg py-2 mb-2">Guardar</button>
-            <button onclick="closeModal('api-modal')" class="w-full text-slate-400 text-sm py-2">Cancelar</button>
-        </div>
-    </div>
+// --- UI CHAT ---
+function addMessageToChat(text, role) {
+  if (!chatMessages) return;
+  const msgEl = document.createElement('div');
+  msgEl.className = `chat-message ${role}`;
+  const p = document.createElement('p');
+  msgEl.appendChild(p);
+  chatMessages.appendChild(msgEl);
+  
+  if (role === 'model') typeMessage(p, text);
+  else p.textContent = text;
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
 
-    <!-- MODAL: Drive Login -->
-    <div id="login-modal" class="fixed inset-0 bg-slate-900/90 hidden z-50 flex justify-center items-center">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8 text-center">
-            <div class="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4"><i class="fas fa-cloud text-white text-2xl"></i></div>
-            <h2 class="text-xl font-bold text-slate-800 mb-2">Google Drive</h2>
-            <p id="drive-modal-desc" class="text-sm text-slate-500 mb-6">Inicia sesión para guardar y sincronizar PDFs y notas en "APP Estudio - Datos".</p>
-            <button id="btn-login-drive" onclick="window.GoogleDriveSync.login()" class="w-full bg-white border border-slate-300 py-3 rounded-lg flex items-center justify-center gap-3 mb-4 font-semibold text-slate-700 hover:bg-slate-50">
-                <i class="fab fa-google text-red-500"></i> Iniciar sesión
-            </button>
-            <button id="btn-logout-drive" onclick="window.GoogleDriveSync.logout()" class="hidden w-full bg-red-50 hover:bg-red-100 border border-red-200 py-3 rounded-lg flex items-center justify-center gap-3 mb-4 font-semibold text-red-600 transition-colors">
-                <i class="fas fa-sign-out-alt"></i> Cerrar sesión de Drive
-            </button>
-            <button onclick="closeModal('login-modal')" class="text-sm text-slate-400">Cerrar ventana</button>
-        </div>
-    </div>
+function typeMessage(element, text) {
+  let index = 0;
+  element.textContent = '';
+  const intervalId = setInterval(() => {
+    if (index < text.length) {
+      element.textContent += text[index];
+      index++;
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    } else {
+      clearInterval(intervalId);
+    }
+  }, 10);
+}
 
-    <!-- SCRIPTS MODULARES -->
-    <script src="app.js"></script>
-    <script src="ai-original.js"></script>
-    <script src="local-summary.js"></script> 
-    <script src="google-drive-sync.js"></script>
-    <script src="google-drive-ui.js"></script>
+// --- HERRAMIENTAS DE TEXTO ---
+function preserveSelection(callback) {
+  const selection = window.getSelection();
+  const ranges = [];
+  if (selection && selection.rangeCount) {
+    for (let i = 0; i < selection.rangeCount; i++) ranges.push(selection.getRangeAt(i).cloneRange());
+  }
+  callback();
+  if (selection) {
+    selection.removeAllRanges();
+    ranges.forEach(r => selection.addRange(r));
+  }
+}
 
-</body>
+function applyTextStyle(cmd) { preserveSelection(() => { document.execCommand('styleWithCSS', false, true); document.execCommand(cmd, false, null); }); textEditor.focus(); }
+function applyTextColor(col) { preserveSelection(() => { document.execCommand('styleWithCSS', false, true); document.execCommand('foreColor', false, col); }); textEditor.focus(); }
+function applyTextAlignment(cmd) { preserveSelection(() => document.execCommand(cmd, false, null)); textEditor.focus(); }
+function applyTextFamily(font) { preserveSelection(() => { document.execCommand('styleWithCSS', false, true); document.execCommand('fontName', false, font); }); textEditor.focus(); }
+
+function applyTextSize(sizeValue) {
+  preserveSelection(() => {
+    document.execCommand('styleWithCSS', false, true);
+    document.execCommand('fontSize', false, 7);
+    textEditor.querySelectorAll('font[size="7"]').forEach(el => {
+      const span = document.createElement('span');
+      span.style.fontSize = sizeValue;
+      span.innerHTML = el.innerHTML;
+      el.parentNode.replaceChild(span, el);
+    });
+  });
+  textEditor.focus();
+}
+
+// --- IA / API FETCH ---
+async function getApiKey() {
+  if (geminiApiKey !== null) return geminiApiKey;
+  const savedKey = localStorage.getItem('gemini_api_key');
+  if (savedKey) { geminiApiKey = savedKey; return savedKey; }
+  const userKey = prompt('Por favor, introduce tu API Key de Google AI Studio (deja en blanco si pruebas aquí en la plataforma):', '');
+  if (userKey !== null) {
+    localStorage.setItem('gemini_api_key', userKey.trim());
+    geminiApiKey = userKey.trim();
+    if (geminiApiKey !== '') showToast('API Key guardada');
+    return geminiApiKey;
+  }
+  showToast('API Key necesaria para la IA.');
+  return null;
+}
+
+// 🆕 Detección dinámica del mejor modelo disponible según la API Key
+let cachedBestModel = null;
+async function getBestModel(apiKey) {
+    if (cachedBestModel) return cachedBestModel;
+    const keyToUse = apiKey || geminiApiKey;
+    if (!keyToUse) return 'gemini-1.5-flash';
+    
+    try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${keyToUse}`);
+        if (res.ok) {
+            const data = await res.json();
+            const bestModel = data.models.find(m => m.name.includes('gemini-2.5-flash') && m.supportedGenerationMethods?.includes('generateContent')) ||
+                              data.models.find(m => m.name.includes('gemini-2.0-flash') && m.supportedGenerationMethods?.includes('generateContent')) ||
+                              data.models.find(m => m.name.includes('gemini-1.5-flash') && m.supportedGenerationMethods?.includes('generateContent')) ||
+                              data.models.find(m => m.name.includes('gemini') && m.supportedGenerationMethods?.includes('generateContent'));
+                              
+            if (bestModel) {
+                cachedBestModel = bestModel.name.split('/').pop();
+                console.log(`🤖 Modelo dinámico seleccionado: ${cachedBestModel}`);
+                return cachedBestModel;
+            }
+        }
+    } catch(e) { console.warn("⚠️ Fallo la obtención de modelos.", e); }
+    return 'gemini-1.5-flash';
+}
+
+async function callGoogleAI(history, apiKey) {
+  const modelToUse = await getBestModel(apiKey);
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${apiKey}`;
+  
+  const response = await fetch(url, {
+    method: 'POST', 
+    headers: { 'Content-Type': 'application/json' }, 
+    body: JSON.stringify({ contents: history })
+  });
+  
+  const data = await response.json();
+  
+  if (response.ok && data.candidates && data.candidates[0].content.parts[0].text) {
+    return data.candidates[0].content.parts[0].text;
+  } else {
+    // Manejo de errores
+    if (data.error && data.error.message.includes('API key not valid')) {
+        cachedBestModel = null; // Limpiar caché si la key es inválida
+        throw new Error("API Key inválida. Verifica tu clave de Google AI Studio.");
+    }
+    throw new Error(`Error API: ${data.error?.message || 'Petición rechazada'}`);
+  }
+}
+
+// --- PAGINACIÓN SIMULADA ---
+function updatePageCounter() {
+  const counter = document.getElementById('page-counter');
+  if (!counter || !textEditor) return;
+  const height = textEditor.scrollHeight;
+  const estimatedPages = Math.max(1, Math.ceil(height / 1130));
+  counter.textContent = `Aprox. ${estimatedPages} página(s)`;
+}
+
+// --- AUTOGUARDADO / DESCARGA ---
+function saveContent(feedback = false) {
+  if (!textEditor) return;
+  localStorage.setItem('editor_content', textEditor.innerHTML);
+  if (feedback) showToast("Progreso guardado");
+}
+
+function loadSavedText() {
+  const savedContent = localStorage.getItem('editor_content');
+  if (savedContent) {
+    textEditor.innerHTML = savedContent;
+  }
+}
+function startAutoSave() { setInterval(() => saveContent(false), 3000); } // Guardado cada 3s es suficiente
+
+function downloadAsDocx() {
+  const content = textEditor.innerHTML;
+  const plainText = textEditor.innerText;
+  
+  if (!plainText.trim()) { showToast("Nada que descargar"); return; }
+  const title = prompt("Título:", "Documento") || "Documento";
+  
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title></head><body style="font-family:Arial, sans-serif; padding:40px; max-width:800px; margin:0 auto; line-height:1.6;"><h1>${title}</h1><div>${content}</div></body></html>`;
+  
+  const blob = new Blob([html], { type: 'application/msword' });
+  const link = document.createElement('a'); 
+  link.href = URL.createObjectURL(blob); 
+  link.download = `${title}.doc`;
+  document.body.appendChild(link); 
+  link.click(); 
+  document.body.removeChild(link);
+  showToast("Documento descargado");
+}
+
+// Utils UI
+function showLoading(msg) { document.getElementById('loading-msg').textContent=msg; loadingIndicator.classList.add('show'); }
+function hideLoading() { loadingIndicator.classList.remove('show'); }
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 3000);
+}
+function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+</script>
 </body>
 </html>
