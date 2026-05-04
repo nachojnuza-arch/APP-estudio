@@ -49,6 +49,24 @@
         input[type=number]::-webkit-inner-spin-button, 
         input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         input[type=number] { appearance: textfield; }
+
+        /* Capa de texto para PDF (para poder copiar) */
+        #text-layer {
+            position: absolute;
+            left: 0;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+        }
+        #text-layer > span {
+            color: transparent;
+            position: absolute;
+            white-space: pre;
+            cursor: text;
+            transform-origin: 0% 0%;
+        }
+        #notes-editor img.selected { box-shadow: 0 0 0 3px #4c6ef5; }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden bg-slate-50 text-slate-800">
@@ -185,15 +203,21 @@
 
                 <!-- Contenido Pestaña Notas -->
                 <div id="tab-content-notes" class="flex-1 flex flex-col overflow-hidden">
-                    <div class="border-b border-slate-100 px-4 py-2 flex items-center justify-between bg-white shrink-0">
-                        <div class="flex gap-1">
-                            <button type="button" title="Negrita" onclick="execCmd('bold')" class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-bold"></i></button>
-                            <button type="button" title="Cursiva" onclick="execCmd('italic')" class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-italic"></i></button>
-                            <button type="button" title="Lista" onclick="execCmd('insertUnorderedList')" class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-list-ul"></i></button>
+                    <div class="border-b border-slate-100 px-4 py-2 flex items-center justify-between bg-white shrink-0 gap-2 overflow-x-auto no-scrollbar">
+                        <div class="flex gap-1 shrink-0">
+                            <button type="button" title="Negrita" onclick="execCmd('bold')" class="w-8 h-8 shrink-0 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-bold"></i></button>
+                            <button type="button" title="Cursiva" onclick="execCmd('italic')" class="w-8 h-8 shrink-0 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-italic"></i></button>
+                            <button type="button" title="Lista" onclick="execCmd('insertUnorderedList')" class="w-8 h-8 shrink-0 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-list-ul"></i></button>
+                            <div class="w-px h-6 bg-slate-200 mx-1 shrink-0 mt-1"></div>
+                            <button type="button" title="Alinear a la izquierda" onclick="alignImage('left')" class="w-8 h-8 shrink-0 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-align-left"></i></button>
+                            <button type="button" title="Centrar imagen" onclick="alignImage('center')" class="w-8 h-8 shrink-0 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-align-center"></i></button>
+                            <button type="button" title="Alinear a la derecha" onclick="alignImage('right')" class="w-8 h-8 shrink-0 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-align-right"></i></button>
+                            <button type="button" title="Achicar imagen" onclick="resizeImage(0.8)" class="w-8 h-8 shrink-0 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-search-minus"></i></button>
+                            <button type="button" title="Agrandar imagen" onclick="resizeImage(1.2)" class="w-8 h-8 shrink-0 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-search-plus"></i></button>
                         </div>
-                        <div class="flex items-center gap-3">
-                            <span id="save-status" class="text-[10px] text-slate-400 uppercase font-bold tracking-widest"><i class="fas fa-check text-emerald-500"></i> Guardado</span>
-                            <button type="button" title="Exportar notas" onclick="exportNotesAsDocx()" class="text-[10px] font-bold text-primary-600 bg-primary-50 hover:bg-primary-100 border border-primary-100 px-3 py-1.5 rounded-lg uppercase tracking-wider transition-colors flex items-center gap-1.5">
+                        <div class="flex items-center gap-3 shrink-0">
+                            <span id="save-status" class="text-[10px] text-slate-400 uppercase font-bold tracking-widest whitespace-nowrap"><i class="fas fa-check text-emerald-500"></i> Guardado</span>
+                            <button type="button" title="Exportar notas" onclick="exportNotesAsDocx()" class="text-[10px] font-bold text-primary-600 bg-primary-50 hover:bg-primary-100 border border-primary-100 px-3 py-1.5 rounded-lg uppercase tracking-wider transition-colors flex items-center gap-1.5 shrink-0">
                                 <i class="fas fa-download text-sm"></i> Exportar
                             </button>
                         </div>
@@ -217,6 +241,7 @@
                             <button type="button" onclick="generateQuiz()" class="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-2 rounded-xl font-medium text-sm transition-colors shadow-sm"><i class="fas fa-question-circle text-primary-500 mr-1"></i> Quiz IA</button>
                             <button type="button" onclick="generateLocalQuiz()" class="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-2 rounded-xl font-medium text-sm transition-colors shadow-sm"><i class="fas fa-list-ol text-emerald-500 mr-1"></i> Quiz Local</button>
                         </div>
+                        <button type="button" id="btn-reopen-ai" onclick="reopenAIFullscreen()" class="hidden w-full bg-slate-800 hover:bg-slate-900 text-white py-2.5 rounded-xl font-medium text-sm transition-colors shadow-sm mt-2"><i class="fas fa-external-link-alt mr-2"></i> Ver último resultado</button>
                         <button type="button" onclick="diagnoseAPI()" class="w-full text-[10px] text-slate-400 hover:text-primary-500 font-medium py-1 mt-1 transition-colors">
                             <i class="fas fa-stethoscope"></i> Diagnóstico de API
                         </button>
@@ -269,8 +294,8 @@
                 <button type="button" onclick="toggleEditAIResult()" id="ai-edit-btn" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg font-medium transition-colors flex items-center gap-2">
                     <i class="fas fa-edit"></i> <span class="hidden md:inline">Editar</span>
                 </button>
-                <button type="button" onclick="closeAIFullscreen()" class="w-8 h-8 bg-slate-100 hover:bg-red-50 hover:text-red-500 text-slate-500 rounded-lg flex items-center justify-center transition-colors">
-                    <i class="fas fa-times"></i> Cerrar
+                <button type="button" onclick="closeAIFullscreen()" class="text-xs bg-slate-100 hover:bg-red-50 hover:text-red-500 text-slate-500 px-3 py-2 rounded-lg font-medium flex items-center justify-center transition-colors gap-2">
+                    <i class="fas fa-times text-sm"></i> <span class="hidden md:inline">Cerrar</span>
                 </button>
             </div>
         </div>

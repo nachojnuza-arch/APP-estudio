@@ -2697,7 +2697,18 @@ function openAIFullscreen(html, title) {
 
     fs.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
+            
+            const reopenBtn = document.getElementById('btn-reopen-ai');
+            if (reopenBtn) reopenBtn.classList.remove('hidden');
 }
+
+        function reopenAIFullscreen() {
+            const fs = document.getElementById('ai-fullscreen');
+            if (fs) {
+                fs.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+            }
+        }
 
 function closeAIFullscreen() {
     document.getElementById('ai-fullscreen').classList.add('hidden');

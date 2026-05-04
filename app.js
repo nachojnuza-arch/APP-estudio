@@ -545,6 +545,11 @@ function goToPage(num) {
 
 function changeZoom(delta) { currentState.zoom = Math.max(0.5, Math.min(3.0, currentState.zoom + delta)); renderPage(); }
 
+document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); if (currentState.pdfDoc) changePage(e.key === 'ArrowRight' ? 1 : -1); }
+    if (e.ctrlKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); if (currentState.pdfDoc) changeZoom(e.key === 'ArrowUp' ? 0.1 : -0.1); }
+});
+
 // ==========================================
 // 7. CAPTURAS DE PANTALLA (HTML2CANVAS)
 // ==========================================
@@ -581,12 +586,54 @@ document.addEventListener('mouseup', async (e) => {
             const c = document.createElement('canvas'); c.width = w; c.height = h;
             c.getContext('2d').drawImage(document.getElementById('pdf-canvas'), Math.min(screenshotState.startX, screenshotState.endX) - canvasRect.left, Math.min(screenshotState.startY, screenshotState.endY) - canvasRect.top, w, h, 0, 0, w, h);
             
-            const img = document.createElement('img'); img.src = c.toDataURL(); img.style.margin = '10px';
-            document.getElementById('notes-editor').appendChild(img);
+            const img = document.createElement('img'); 
+            img.src = c.toDataURL(); 
+            img.style.margin = '10px auto';
+            img.style.display = 'block';
+            
+            const editor = document.getElementById('notes-editor');
+            const sel = window.getSelection();
+            if(sel.rangeCount > 0 && editor.contains(sel.anchorNode)) { 
+                const range = sel.getRangeAt(0); range.insertNode(img); range.setStartAfter(img); sel.removeAllRanges(); sel.addRange(range); 
+            } else { 
+                editor.appendChild(img); 
+            }
             saveCurrentNotes(); showToast('Captura añadida', 'success');
         } catch(err) { showToast('Error en captura', 'error'); }
     }
 });
+
+function alignImage(alignment) {
+    const selectedImage = document.querySelector('#notes-editor img.selected');
+    if (selectedImage) {
+        selectedImage.style.display = 'block';
+        selectedImage.style.float = 'none';
+        selectedImage.style.marginLeft = 'auto';
+        selectedImage.style.marginRight = 'auto';
+        if (alignment === 'left') {
+            selectedImage.style.float = 'left';
+            selectedImage.style.margin = '10px';
+        } else if (alignment === 'right') {
+            selectedImage.style.float = 'right';
+            selectedImage.style.margin = '10px';
+        }
+        saveCurrentNotes();
+    } else {
+        showToast('Haz clic en una imagen para seleccionarla', 'warning');
+    }
+}
+
+function resizeImage(factor) {
+    const selectedImage = document.querySelector('#notes-editor img.selected');
+    if (selectedImage) {
+        let currentWidth = selectedImage.clientWidth || selectedImage.width;
+        selectedImage.style.width = (currentWidth * factor) + 'px';
+        selectedImage.style.height = 'auto';
+        saveCurrentNotes();
+    } else {
+        showToast('Haz clic en una imagen para seleccionarla', 'warning');
+    }
+}
 
 // ==========================================
 // 8. FUNCIONES BÁSICAS DE IA Y EXPORTACIÓN
@@ -643,5 +690,25 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('notes-editor').addEventListener('input', () => {
         clearTimeout(autoSaveTimer);
         autoSaveTimer = setTimeout(saveCurrentNotes, 1500);
+        
+        const editor = document.getElementById('notes-editor');
+        const selection = window.getSelection();
+        if (!selection.rangeCount) return;
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        const editorRect = editor.getBoundingClientRect();
+        const threshold = editorRect.top + editorRect.height * 0.6;
+        if (rect.bottom > threshold) {
+            editor.scrollBy({ top: rect.bottom - threshold + 24, behavior: 'smooth' });
+        }
+    });
+    
+    document.getElementById('notes-editor').addEventListener('click', (e) => {
+        if (e.target.tagName === 'IMG') {
+            document.querySelectorAll('#notes-editor img.selected').forEach(i => i.classList.remove('selected'));
+            e.target.classList.add('selected');
+        } else {
+            document.querySelectorAll('#notes-editor img.selected').forEach(i => i.classList.remove('selected'));
+        }
     });
 });
