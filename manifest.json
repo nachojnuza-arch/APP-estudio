@@ -1,6 +1,6 @@
 {
-  "name": "Apuntes Facultad",
-  "short_name": "Apuntes",
+  "name": "EstudIA",
+  "short_name": "EstudIA",
   "description": "Aplicación para tomar apuntes sobre documentos PDF y PPT.",
   "start_url": "./index.html",
   "display": "standalone",
