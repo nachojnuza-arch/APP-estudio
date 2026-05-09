@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Política de Privacidad y Términos de Servicio - EstudIA</title>
+    <style>
+        body { font-family: system-ui, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; color: #333; }
+        h1, h2 { color: #4f46e5; }
+        p { margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+
+    <h1>Política de Privacidad y Términos de Servicio</h1>
+    <p><strong>Última actualización:</strong>  9 de Mayo de 2026</p>
+
+    <p>Bienvenido a <strong>EstudIA</strong> (en adelante, "la Aplicación"). Esta Política de Privacidad y Términos de Servicio describe cómo recopilamos, usamos, procesamos y protegemos su información cuando utiliza nuestra aplicación web.</p>
+
+    <h2>1. Uso de la Información y Almacenamiento Local</h2>
+    <p>La Aplicación está diseñada para priorizar su privacidad. <strong>No poseemos servidores propios ni bases de datos centralizadas</strong>. Todos sus apuntes, archivos PDF, y configuraciones se almacenan de forma local en su dispositivo utilizando las tecnologías nativas de su navegador (Local Storage e IndexedDB).</p>
+
+    <h2>2. Integración con Google Drive y Uso de Datos de Usuario (API de Google)</h2>
+    <p>La Aplicación ofrece la posibilidad de sincronizar sus apuntes y archivos en la nube utilizando su propia cuenta de Google Drive.</p>
+    <ul>
+        <li><strong>Acceso limitado:</strong> La Aplicación solicita acceso bajo el alcance (scope) <code>https://www.googleapis.com/auth/drive.file</code>. Esto significa que la Aplicación <strong>SOLO</strong> puede ver, crear y modificar los archivos específicos que la propia Aplicación haya creado (como la carpeta "APP Estudio - Datos" y el archivo "workspace_data.json"). No tenemos acceso a sus fotos, correos, ni a otros documentos de su Google Drive.</li>
+        <li><strong>Sincronización directa:</strong> Los datos viajan de manera segura desde su dispositivo directamente a los servidores de Google. El desarrollador de esta Aplicación no intercepta, no lee y no tiene acceso a sus datos sincronizados.</li>
+        <li><strong>Cumplimiento de Políticas de Google:</strong> El uso y la transferencia hacia cualquier otra aplicación de la información recibida de las APIs de Google por parte de EstudIA cumplirán con la <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank">Política de datos de usuario de los servicios API de Google</a>, incluidos los requisitos de Uso Limitado (Limited Use requirements).</li>
+    </ul>
+
+    <h2>3. Uso de Inteligencia Artificial (Google Gemini)</h2>
+    <p>Para las funciones de resumen y generación de cuestionarios, la Aplicación utiliza la API de Google Gemini.
+    Al utilizar esta función, los textos de sus apuntes y los fragmentos de los PDFs que usted haya cargado son enviados directamente a la API de Google Gemini para su procesamiento temporal y generación de respuestas. Si usted proporciona su propia clave de API (API Key), esta se guarda exclusivamente en el almacenamiento local (Local Storage) de su navegador y nunca es compartida con terceros ni con el desarrollador.</p>
+
+    <h2>4. Retención y Eliminación de Datos</h2>
+    <p>Dado que los datos residen en su dispositivo o en su cuenta personal de Google Drive:</p>
+    <ul>
+        <li>Usted puede eliminar todos los datos locales borrando los datos de navegación de su navegador o utilizando el botón "Borrar Todo" dentro de la Aplicación.</li>
+        <li>Para eliminar los datos de la nube, simplemente acceda a su Google Drive y elimine la carpeta "APP Estudio - Datos".</li>
+        <li>Puede revocar el acceso de la Aplicación a su cuenta de Google en cualquier momento desde la <a href="https://myaccount.google.com/permissions" target="_blank">página de permisos de su cuenta de Google</a>.</li>
+    </ul>
+
+    <h2>5. Términos de Servicio y Limitación de Responsabilidad</h2>
+    <p>El uso de la Aplicación es bajo su propio riesgo. La Aplicación se proporciona "tal cual" y "según disponibilidad", sin garantías de ningún tipo, ya sean expresas o implícitas.</p>
+    <p>El desarrollador no se hace responsable de la pérdida de datos, por lo que recomendamos mantener la sincronización con Google Drive activa como copia de seguridad.</p>
+
+    <h2>6. Contacto</h2>
+    <p>Si tiene alguna pregunta, inquietud o queja sobre nuestra Política de Privacidad o las prácticas de manejo de datos, puede comunicarse con nosotros en: <strong>nachojnuza@gmail.com</strong>.</p>
+
+</body>
+</html>
