@@ -16,6 +16,7 @@
     <!-- html2canvas -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <!-- PDF.js via CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     
@@ -151,7 +152,7 @@
         <div class="flex-1 flex flex-row overflow-hidden relative">
 
             <!-- Visor Izquierdo (Media) -->
-            <div id="media-viewer" class="flex-1 bg-slate-100 relative overflow-auto flex justify-center items-start panel-transition h-full w-full">
+            <div id="media-viewer" class="flex-1 bg-slate-100 relative overflow-auto flex items-start panel-transition h-full w-full">
 
                 <!-- Dashboard de Materia (Apuntes Generales) -->
                 <div id="subject-dashboard" class="hidden absolute inset-0 z-15 p-6 md:p-10 overflow-y-auto bg-slate-50/50 backdrop-blur-sm w-full h-full"></div>
@@ -166,7 +167,10 @@
                 </div>
 
                 <!-- Contenedores multimedia -->
-                <canvas id="pdf-canvas" class="hidden my-6 shadow-xl border border-slate-200 rounded relative z-20"></canvas>
+                <div id="pdf-container" class="hidden relative my-6 mx-auto shadow-xl border border-slate-200 rounded z-20" style="background: white;">
+                    <canvas id="pdf-canvas" class="block"></canvas>
+                    <div id="text-layer" class="textLayer"></div>
+                </div>
                 <div id="video-container" class="hidden w-full h-full bg-black relative z-20"></div>
 
                 <!-- Controles PDF Flotantes -->

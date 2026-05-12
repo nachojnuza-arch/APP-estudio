@@ -382,7 +382,7 @@ function toggleAiSource(fileId) {
 // 6. VISOR DE PDF, NOTAS Y NAVEGACIÓN
 // ==========================================
 function showEmptyState() {
-    document.getElementById('pdf-canvas').classList.add('hidden');
+    document.getElementById('pdf-container').classList.add('hidden');
     document.getElementById('video-container').classList.add('hidden');
     document.getElementById('pdf-controls').classList.add('hidden');
     document.getElementById('header-title').textContent = 'Workspace';
@@ -426,7 +426,7 @@ function openGeneralNotes(subId) {
     document.getElementById('notes-editor').innerHTML = appData.notes[currentState.currentFileId] || '';
     
     document.getElementById('empty-state').classList.add('hidden');
-    document.getElementById('pdf-canvas').classList.add('hidden');
+    document.getElementById('pdf-container').classList.add('hidden');
     document.getElementById('video-container').classList.add('hidden');
     document.getElementById('pdf-controls').classList.add('hidden');
     
@@ -484,7 +484,7 @@ async function openFile(subId, fileId) {
 
     document.getElementById('empty-state').classList.add('hidden');
     document.getElementById('subject-dashboard')?.classList.add('hidden');
-    const pdfCanvas = document.getElementById('pdf-canvas');
+    const pdfContainer = document.getElementById('pdf-container');
     const videoCont = document.getElementById('video-container');
 
     if (file.type === 'pdf') {
@@ -502,13 +502,13 @@ async function openFile(subId, fileId) {
         }
 
         if (blob || file.url) {
-            pdfCanvas.classList.remove('hidden'); document.getElementById('pdf-controls').classList.remove('hidden');
+            pdfContainer.classList.remove('hidden'); document.getElementById('pdf-controls').classList.remove('hidden');
             const url = blob ? URL.createObjectURL(blob) : file.url;
             currentState.pdfDoc = await pdfjsLib.getDocument(url).promise;
             currentState.pageNum = 1; renderPage();
         }
     } else {
-        pdfCanvas.classList.add('hidden'); document.getElementById('pdf-controls').classList.add('hidden');
+        pdfContainer.classList.add('hidden'); document.getElementById('pdf-controls').classList.add('hidden');
         videoCont.classList.remove('hidden');
         videoCont.innerHTML = `<iframe src="${file.url}" class="w-full h-full border-0" allowfullscreen></iframe>`;
     }
@@ -521,13 +521,34 @@ async function renderPage() {
         const page = await currentState.pdfDoc.getPage(currentState.pageNum);
         const canvas = document.getElementById('pdf-canvas');
         const viewport = page.getViewport({ scale: currentState.zoom });
-        canvas.height = viewport.height; canvas.width = viewport.width;
+        
+        const container = document.getElementById('pdf-container');
+        container.style.width = viewport.width + 'px';
+        container.style.height = viewport.height + 'px';
+
+        canvas.height = viewport.height; 
+        canvas.width = viewport.width;
         await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
         
+        // Capa de texto para selección
+        const textLayerDiv = document.getElementById('text-layer');
+        textLayerDiv.innerHTML = ''; 
+        textLayerDiv.style.setProperty('--scale-factor', viewport.scale);
+        
+        const textContent = await page.getTextContent();
+        pdfjsLib.renderTextLayer({
+            textContentSource: textContent,
+            container: textLayerDiv,
+            viewport: viewport,
+            textDivs: []
+        });
+
         document.getElementById('page-input').value = currentState.pageNum;
         document.getElementById('page-total').textContent = currentState.pdfDoc.numPages;
         document.getElementById('zoom-info').textContent = `${Math.round(currentState.zoom * 100)}%`;
-    } catch(e) {}
+    } catch(e) {
+        console.error("Error renderizando PDF:", e);
+    }
     currentState.isRendering = false;
 }
 
