@@ -17,9 +17,28 @@ window.GoogleDriveSync = {
     
     // 1. Inicializa la API de Google cuando carga la página
     init(retries = 10) {
-        if(typeof gapi !== 'undefined') {
+        if(typeof gapi !== 'undefined' && typeof google !== 'undefined') {
             gapi.load('client', () => {
                 gapi.client.init({}).then(() => this.checkExistingToken());
+            });
+            this.tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID, 
+                scope: SCOPES,
+                callback: (response) => {
+                    if (response.error) {
+                        console.error("Error en login:", response.error);
+                        if(typeof showToast === 'function') showToast('Error al iniciar sesión', 'error');
+                        return;
+                    }
+                    this.token = response.access_token;
+                    gapi.client.setToken({ access_token: this.token });
+                    localStorage.setItem('gdrive_token', this.token);
+                    this.isLoggedIn = true;
+                    this.updateUI();
+                    if(typeof closeModal === 'function') closeModal('login-modal');
+                    if(typeof showToast === 'function') showToast('Conectado a Drive.', 'success');
+                    this.initAppFolder();
+                }
             });
         } else if (retries > 0) {
             setTimeout(() => this.init(retries - 1), 500);
@@ -35,12 +54,14 @@ window.GoogleDriveSync = {
             this.token = storedToken;
             gapi.client.setToken({ access_token: storedToken });
             this.validateToken().then(isValid => {
+                this.isLoggedIn = true;
+                this.updateUI();
                 if (isValid) {
-                    this.isLoggedIn = true;
-                    this.updateUI();
                     this.initAppFolder(); // Conecta a la carpeta y descarga datos
                 } else {
-                    localStorage.removeItem('gdrive_token');
+                    console.warn("Drive Token expirado. Se intentará renovar en segundo plano.");
+                    // Intentar renovar el token si expiró
+                    if(this.tokenClient) this.tokenClient.requestAccessToken({prompt: ''});
                 }
             });
         }
@@ -49,8 +70,10 @@ window.GoogleDriveSync = {
     async validateToken() {
         try {
             const res = await fetch(`https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${this.token}`);
-            return res.ok;
-        } catch(e) { return false; }
+            return res.status !== 400 && res.status !== 401; // false solo si google dice explícitamente que es inválido
+        } catch(e) { 
+            return true; // Si no hay internet, asumimos que es válido para no desloguear
+        }
     },
     
     // 3. Flujo principal de Login (Botón del Modal)
@@ -253,13 +276,11 @@ window.GoogleDriveSync = {
             
         } catch(e) { 
             if (e && e.status === 401) {
-                console.warn("Token de Google expirado (401).");
-                this.isLoggedIn = false;
-                localStorage.removeItem('gdrive_token');
-                this.updateUI();
-                if(typeof showToast === 'function') showToast('Sesión de Drive expirada. Vuelve a conectar.', 'error');
+                console.warn("Token de Google expirado (401). Intentando renovar...");
+                if (this.tokenClient) this.tokenClient.requestAccessToken({prompt: ''});
+            } else {
+                console.error('Error guardando JSON en Drive', e); 
             }
-            console.error('Error guardando JSON en Drive', e); 
         }
     },
     

@@ -711,4 +711,11 @@ window.addEventListener('DOMContentLoaded', async () => {
             document.querySelectorAll('#notes-editor img.selected').forEach(i => i.classList.remove('selected'));
         }
     });
+
+    // Guardar inmediatamente si el usuario cambia de pestaña o cierra el navegador
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+            saveCurrentNotes();
+        }
+    });
 });
