@@ -733,6 +733,50 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
+    // Interceptar el pegado para evitar estilos indeseados (ej. color transparente desde el PDF)
+    document.getElementById('notes-editor').addEventListener('paste', (e) => {
+        e.preventDefault();
+        
+        // Obtener texto plano del portapapeles
+        const text = (e.originalEvent || e).clipboardData.getData('text/plain');
+        
+        if (text) {
+            document.execCommand('insertText', false, text);
+        } else {
+            // Si no hay texto plano pero hay imágenes
+            const items = (e.originalEvent || e).clipboardData.items;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    const blob = items[i].getAsFile();
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const img = document.createElement('img');
+                        img.src = event.target.result;
+                        img.style.maxWidth = '100%';
+                        img.style.borderRadius = '8px';
+                        img.style.marginTop = '10px';
+                        img.style.marginBottom = '10px';
+                        
+                        // Insertar imagen
+                        const sel = window.getSelection();
+                        if (sel.getRangeAt && sel.rangeCount) {
+                            const range = sel.getRangeAt(0);
+                            range.insertNode(img);
+                            // Mover cursor después de la imagen
+                            range.setStartAfter(img);
+                            range.setEndAfter(img);
+                            sel.removeAllRanges();
+                            sel.addRange(range);
+                        } else {
+                            document.getElementById('notes-editor').appendChild(img);
+                        }
+                    };
+                    reader.readAsDataURL(blob);
+                }
+            }
+        }
+    });
+
     // Guardar inmediatamente si el usuario cambia de pestaña o cierra el navegador
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
