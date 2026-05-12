@@ -1291,8 +1291,9 @@ let geminiApiKey = null;
 let pendingAIFunction = null;
 
 // Plantillas compactas (ahorrar tokens)
-const PROMPT_TEMPLATES = {
-    summary: `Resumí y estructurá estos apuntes de un estudiante en español.
+const PT_TEMPLATES = {
+    summary: `Resumí y estructurá estos apuntes de un estudiante en español. En un formato claro y organizado, combinando mis ideas con datos relevantes del contexto (si los hay).
+    la estructura debe ser fácil de leer y repasar, con títulos, viñetas, cuadros comparativos y explicaciones de los conceptos abordados en las notas.
 
 📝 MIS APUNTES:
 {{userNotes}}
@@ -1302,9 +1303,9 @@ const PROMPT_TEMPLATES = {
 Estructurá la respuesta así:
 ### 🧠 Conceptos Clave
 • [Concepto]: definición precisa
-### 📝 Explicación Integrada
+📝 Explicación Integrada
 [Desarrollo breve combinando mis ideas con datos del contexto]
-### ❓ 3 Preguntas de Autoevaluación
+❓ 3 Preguntas de Autoevaluación
 
 Usá mis apuntes como guía principal. Del contexto, solo usá lo que complemente mis temas. Respuesta:`,
 
