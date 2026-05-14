@@ -14,101 +14,184 @@ window.GoogleDriveSync = {
     isLoggedIn: false, 
     token: null, 
     folderId: null,
-    
+    tokenClient: null,
+    _silentRefreshAttempt: false,
+
+    persistTokenResponse(response) {
+        this.token = response.access_token;
+        gapi.client.setToken({ access_token: this.token });
+        localStorage.setItem('gdrive_token', this.token);
+        if (response.expires_in) {
+            localStorage.setItem('gdrive_token_expiry', String(Date.now() + Number(response.expires_in) * 1000));
+        }
+    },
+
+    clearStoredCredentials() {
+        this.token = null;
+        this.folderId = null;
+        this.isLoggedIn = false;
+        localStorage.removeItem('gdrive_token');
+        localStorage.removeItem('gdrive_token_expiry');
+        if (typeof gapi !== 'undefined' && gapi.client) {
+            gapi.client.setToken(null);
+        }
+    },
+
+    onTokenClientResponse(response) {
+        if (response.error) {
+            console.warn('Google OAuth:', response.error, response.error_description || '');
+            const wasSilent = this._silentRefreshAttempt;
+            this._silentRefreshAttempt = false;
+            if (wasSilent || this.isLoggedIn) {
+                this.clearStoredCredentials();
+                this.updateUI();
+                if (typeof showToast === 'function') {
+                    showToast('Sesión de Drive caducada. Iniciá sesión de nuevo para seguir sincronizando.', 'error');
+                }
+            } else if (typeof showToast === 'function') {
+                showToast('No se pudo iniciar sesión en Drive', 'error');
+            }
+            this.maybeOpenDriveLoginModal();
+            return;
+        }
+        const wasSilent = this._silentRefreshAttempt;
+        this._silentRefreshAttempt = false;
+        this.persistTokenResponse(response);
+        this.isLoggedIn = true;
+        this.updateUI();
+        if (typeof closeModal === 'function') closeModal('login-modal');
+        if (!wasSilent && typeof showToast === 'function') {
+            showToast('Conectando a Drive. Preparando tu carpeta…', 'success');
+        }
+        this.initAppFolder();
+    },
+
+    ensureTokenClient() {
+        if (this.tokenClient || typeof google === 'undefined') return;
+        this.tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID,
+            scope: SCOPES,
+            callback: (r) => this.onTokenClientResponse(r)
+        });
+    },
+
     // 1. Inicializa la API de Google cuando carga la página
     init(retries = 10) {
-        if(typeof gapi !== 'undefined' && typeof google !== 'undefined') {
+        if (typeof gapi !== 'undefined' && typeof google !== 'undefined') {
+            this.ensureTokenClient();
             gapi.load('client', () => {
-                gapi.client.init({}).then(() => this.checkExistingToken());
-            });
-            this.tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: CLIENT_ID, 
-                scope: SCOPES,
-                callback: (response) => {
-                    if (response.error) {
-                        console.error("Error en login:", response.error);
-                        if(typeof showToast === 'function') showToast('Error al iniciar sesión', 'error');
-                        return;
-                    }
-                    this.token = response.access_token;
-                    gapi.client.setToken({ access_token: this.token });
-                    localStorage.setItem('gdrive_token', this.token);
-                    this.isLoggedIn = true;
-                    this.updateUI();
-                    if(typeof closeModal === 'function') closeModal('login-modal');
-                    if(typeof showToast === 'function') showToast('Conectado a Drive.', 'success');
-                    this.initAppFolder();
-                }
+                gapi.client.init({}).then(() => this.restoreDriveSession());
             });
         } else if (retries > 0) {
             setTimeout(() => this.init(retries - 1), 500);
         } else {
-            console.warn("La API de Google (GAPI) no se cargó correctamente.");
+            console.warn('La API de Google (GAPI) no se cargó correctamente.');
+            this.maybeOpenDriveLoginModal();
         }
     },
-    
-    // 2. Verifica si el usuario ya tenía una sesión activa
-    checkExistingToken() {
+
+    /** Seguir solo con datos locales en esta sesión del navegador (no mostrar de nuevo el aviso hasta cerrar pestaña/navegador). */
+    skipDriveThisSession() {
+        try {
+            sessionStorage.setItem('drive_skip_login_prompt', '1');
+        } catch (e) { /* ignore */ }
+        if (typeof closeModal === 'function') closeModal('login-modal');
+    },
+
+    maybeOpenDriveLoginModal() {
+        if (this.isLoggedIn) return;
+        let dismissed = false;
+        try {
+            dismissed = sessionStorage.getItem('drive_skip_login_prompt') === '1';
+        } catch (e) { /* ignore */ }
+        if (dismissed) return;
+        setTimeout(() => {
+            if (this.isLoggedIn) return;
+            if (typeof openModal === 'function') openModal('login-modal');
+        }, 600);
+    },
+
+    async restoreDriveSession() {
         const storedToken = localStorage.getItem('gdrive_token');
-        if (storedToken) {
-            this.token = storedToken;
-            gapi.client.setToken({ access_token: storedToken });
-            this.validateToken().then(isValid => {
+        if (!storedToken) {
+            this.isLoggedIn = false;
+            this.updateUI();
+            this.maybeOpenDriveLoginModal();
+            return;
+        }
+        this.token = storedToken;
+        gapi.client.setToken({ access_token: storedToken });
+
+        const expiry = parseInt(localStorage.getItem('gdrive_token_expiry') || '0', 10);
+        const freshEnough = expiry && Date.now() < expiry - 90_000;
+
+        if (freshEnough) {
+            const ok = await this.validateToken();
+            if (ok) {
                 this.isLoggedIn = true;
                 this.updateUI();
-                if (isValid) {
-                    this.initAppFolder(); // Conecta a la carpeta y descarga datos
-                } else {
-                    console.warn("Drive Token expirado. Se intentará renovar en segundo plano.");
-                    // Intentar renovar el token si expiró
-                    if(this.tokenClient) this.tokenClient.requestAccessToken({prompt: ''});
-                }
-            });
+                await this.initAppFolder();
+                return;
+            }
+        }
+
+        const ok = await this.validateToken();
+        if (ok) {
+            this.isLoggedIn = true;
+            this.updateUI();
+            await this.initAppFolder();
+            return;
+        }
+
+        console.warn('Token de Drive inválido o vencido. Intentando renovación silenciosa…');
+        this.isLoggedIn = false;
+        this.updateUI();
+        if (this.tokenClient) {
+            this._silentRefreshAttempt = true;
+            try {
+                this.tokenClient.requestAccessToken({ prompt: '' });
+            } catch (e) {
+                this._silentRefreshAttempt = false;
+                this.clearStoredCredentials();
+                this.updateUI();
+                this.maybeOpenDriveLoginModal();
+            }
+        } else {
+            this.clearStoredCredentials();
+            this.updateUI();
+            this.maybeOpenDriveLoginModal();
         }
     },
-    
+
     async validateToken() {
+        if (!this.token) return false;
         try {
-            const res = await fetch(`https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${this.token}`);
-            return res.status !== 400 && res.status !== 401; // false solo si google dice explícitamente que es inválido
-        } catch(e) { 
-            return true; // Si no hay internet, asumimos que es válido para no desloguear
+            const res = await fetch('https://www.googleapis.com/drive/v3/about?fields=user', {
+                headers: { Authorization: 'Bearer ' + this.token }
+            });
+            if (res.status === 401 || res.status === 403) return false;
+            return true;
+        } catch (e) {
+            return true;
         }
     },
-    
+
     // 3. Flujo principal de Login (Botón del Modal)
     login() {
         if (CLIENT_ID === 'TU_CLIENT_ID_DE_GOOGLE_AQUI') {
-            if(typeof showToast === 'function') {
+            if (typeof showToast === 'function') {
                 showToast('Aviso: Configura tu CLIENT_ID real de Google Cloud en google-drive-sync.js para habilitar la nube.', 'error');
             }
-            // Si quieres permitir pruebas locales ignorando el login real, comenta el return y el showToast.
-            return; 
+            return;
         }
-
-        const client = google.accounts.oauth2.initTokenClient({
-            client_id: CLIENT_ID, 
-            scope: SCOPES,
-            callback: (response) => {
-                if (response.error) {
-                    console.error("Error en login:", response.error);
-                    if(typeof showToast === 'function') showToast('Error al iniciar sesión', 'error');
-                    return;
-                }
-                
-                this.token = response.access_token;
-                gapi.client.setToken({ access_token: this.token });
-                localStorage.setItem('gdrive_token', this.token);
-                this.isLoggedIn = true;
-                
-                this.updateUI();
-                if(typeof closeModal === 'function') closeModal('login-modal');
-                if(typeof showToast === 'function') showToast('Conectando a Drive. Preparando tu carpeta...', 'success');
-                
-                this.initAppFolder();
+        this.ensureTokenClient();
+        if (!this.tokenClient) {
+            if (typeof showToast === 'function') {
+                showToast('Google Identity no está listo. Probá de nuevo en unos segundos.', 'error');
             }
-        });
-        client.requestAccessToken();
+            return;
+        }
+        this.tokenClient.requestAccessToken({ prompt: 'select_account' });
     },
     
     updateUI() {
@@ -122,6 +205,7 @@ window.GoogleDriveSync = {
 
         const btnLogin = document.getElementById('btn-login-drive');
         const btnLogout = document.getElementById('btn-logout-drive');
+        const btnSkip = document.getElementById('btn-skip-drive-session');
         const modalDesc = document.getElementById('drive-modal-desc');
         
         if (btnLogin && btnLogout && modalDesc) {
@@ -129,22 +213,18 @@ window.GoogleDriveSync = {
                 btnLogin.classList.add('hidden');
                 btnLogout.classList.remove('hidden');
                 modalDesc.textContent = 'Estás conectado a Google Drive. Los cambios se guardan y sincronizan automáticamente.';
+                if (btnSkip) btnSkip.classList.add('hidden');
             } else {
                 btnLogin.classList.remove('hidden');
                 btnLogout.classList.add('hidden');
-                modalDesc.textContent = 'Inicia sesión para guardar y sincronizar PDFs y notas en "APP Estudio - Datos".';
+                modalDesc.textContent = 'Al iniciar la app te pedimos conectar Drive para no perder PDFs y apuntes. Podés usar solo local, pero el respaldo es en la nube.';
+                if (btnSkip) btnSkip.classList.remove('hidden');
             }
         }
     },
 
     logout() {
-        this.isLoggedIn = false;
-        this.token = null;
-        this.folderId = null;
-        localStorage.removeItem('gdrive_token');
-        if (typeof gapi !== 'undefined' && gapi.client) {
-            gapi.client.setToken(null);
-        }
+        this.clearStoredCredentials();
         this.updateUI();
         if (typeof showToast === 'function') {
             showToast('Sesión de Drive cerrada. Ahora usas almacenamiento local.', 'info');
@@ -277,7 +357,10 @@ window.GoogleDriveSync = {
         } catch(e) { 
             if (e && e.status === 401) {
                 console.warn("Token de Google expirado (401). Intentando renovar...");
-                if (this.tokenClient) this.tokenClient.requestAccessToken({prompt: ''});
+                if (this.tokenClient) {
+                    this._silentRefreshAttempt = true;
+                    this.tokenClient.requestAccessToken({ prompt: '' });
+                }
             } else {
                 console.error('Error guardando JSON en Drive', e); 
             }

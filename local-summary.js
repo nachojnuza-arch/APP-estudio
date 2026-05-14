@@ -11,7 +11,7 @@
  * - Exportación a Google Docs
  */
 
-const LOCAL_SUMMARY_VERSION = '1.0.0';
+const LOCAL_SUMMARY_VERSION = '1.1.0';
 
 // ==========================================
 // CONFIGURACIÓN GLOBAL
@@ -245,6 +245,13 @@ function tokenize(text) {
         .filter(w => w.length > 2);
 }
 
+/** Apuntes a veces llegan con HTML residual; normalizamos a texto para coincidencias. */
+function stripHtmlTags(raw) {
+    if (!raw || typeof raw !== 'string') return '';
+    const tmp = raw.replace(/<script[\s\S]*?<\/script>/gi, ' ');
+    return tmp.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 function stopwordsES() {
     return new Set([
         'el','la','los','las','un','una','de','del','al','en','con','por','para','que','y','o',
@@ -401,7 +408,79 @@ class FastTFIDF {
         return sentences
             .map(p => p.trim())
             .filter(p => p.length > 40 && p.length < 3000); // Oraciones válidas
-    }    
+    }
+
+    /**
+     * Párrafos lógicos del PDF: bloques separados por línea en blanco o, si el texto es denso,
+     * ventanas de varias oraciones para mantener contexto alineable con tus apuntes.
+     */
+    splitParagraphs(text) {
+        const normalized = text.replace(/\s+/g, ' ').trim();
+        let blocks = text.split(/\n\s*\n+/).map(p => p.replace(/\s+/g, ' ').trim())
+            .filter(p => p.length >= 120 && p.length < 14000);
+        if (blocks.length < 3) {
+            const sentences = this.splitSentences(text);
+            blocks = [];
+            const step = 5;
+            for (let i = 0; i < sentences.length; i += step) {
+                const chunk = sentences.slice(i, i + step).join(' ');
+                if (chunk.length >= 100) blocks.push(chunk);
+            }
+        }
+        if (blocks.length === 0 && normalized.length >= 100) {
+            blocks = [normalized];
+        }
+        return blocks.map((t, index) => ({ index, text: t }));
+    }
+
+    /** TF-IDF por párrafo (misma lógica que oraciones, sin favorecer bloques enormes irrelevantes). */
+    scoreParagraphs(paragraphObjs, userNotes) {
+        const texts = paragraphObjs.map(o => o.text);
+        const idf = this.calculateIDF(texts.concat([userNotes]));
+        const userTokens = new Set(tokenize(userNotes));
+        const scores = [];
+
+        for (let i = 0; i < paragraphObjs.length; i++) {
+            const paragraph = paragraphObjs[i].text;
+            const tokens = tokenize(paragraph);
+            const tf = this.calculateTermFrequency(tokens);
+
+            let score = 0;
+            let matchCount = 0;
+
+            for (const token in tf) {
+                if (userTokens.has(token)) {
+                    score += tf[token] * (idf[token] || 1) * 4;
+                    matchCount++;
+                } else {
+                    score += tf[token] * (idf[token] || 1) * 0.14;
+                }
+            }
+
+            for (const [term, synonyms] of Object.entries(MEDICAL_DICTIONARY.synonyms)) {
+                if (userTokens.has(term)) {
+                    for (const syn of synonyms) {
+                        if (tokens.includes(syn)) {
+                            score += 2.5;
+                            matchCount++;
+                        }
+                    }
+                }
+            }
+
+            score /= Math.sqrt(tokens.length + 2);
+
+            scores.push({
+                index: paragraphObjs[i].index,
+                text: paragraph,
+                score,
+                matchCount
+            });
+        }
+
+        return scores.sort((a, b) => b.score - a.score);
+    }
+    
     cleanText(text) {
         // ✅ ELIMINAR BASURA: guiones de salto de línea, números de página, figuras, etc.
         let cleaned = text
@@ -524,6 +603,30 @@ class LightweightVectors {
         
         return scores.sort((a, b) => b.score - a.score);
     }
+
+    /** Misma unidad (párrafo) que TF-IDF para que los índices coincidan. */
+    scoreParagraphs(paragraphObjs, userNotes) {
+        const userVector = this.sentenceVector(userNotes);
+        if (!userVector) {
+            return paragraphObjs.map(o => ({ index: o.index, text: o.text, score: 0.5 }));
+        }
+
+        const scores = [];
+        for (const p of paragraphObjs) {
+            const sentVector = this.sentenceVector(p.text);
+            let score = 0.06;
+            if (sentVector) {
+                score = Math.max(this.cosineSimilarity(userVector, sentVector), 0.06);
+            }
+            scores.push({
+                index: p.index,
+                text: p.text,
+                score
+            });
+        }
+
+        return scores.sort((a, b) => b.score - a.score);
+    }
 }
 
 // ==========================================
@@ -537,42 +640,51 @@ class SummaryEngine {
     }
     
     generateSummary(text, userNotes, mode = 'PRECISE') {
-        const config = SUMMARY_CONFIG;
-        
-        // ✅ TAMAÑO ADAPTATIVO SEGÚN LARGO DE LOS APUNTES DEL USUARIO
-        const notesLength = userNotes.trim().length;
-        const adaptiveSentences = Math.max(7, Math.min(35, Math.floor(notesLength / 55)));
+        const notesPlain = stripHtmlTags(userNotes).trim();
+        const notesLength = notesPlain.length;
 
-        // ✅ LIMPIAR EL TEXTO DEL PDF ANTES DE PROCESAR
         const cleanedText = this.tfidf.cleanText(text);
         const translatedText = translateToSpanish(cleanedText);
-        const translatedNotes = translateToSpanish(userNotes);
-        
-        // ✅ EXTRAER CONCEPTOS CLAVE DIRECTAMENTE DE TUS APUNTES PRIMERO
-        const userKeywords = this.extractKeywordsFromNotes(userNotes);
-        
-        // ✅ GUARDAR APUNTES PARA USAR EN buildCleanSummary
-        this.setLastUserNotes(userNotes);
-        
-        const tfidfScores = this.tfidf.scoreSentences(translatedText, translatedNotes);
-        const vectorScores = this.vectors.scoreSentences(translatedText, translatedNotes);
-        
-        // ✅ PONDERACIÓN 70% TUS APUNTES / 30% TEXTO FUENTE
-        const weights = { tfidf: 0.7, vector: 0.3 };
+        const translatedNotes = translateToSpanish(notesPlain);
+
+        const paragraphObjs = this.tfidf.splitParagraphs(translatedText);
+        if (paragraphObjs.length === 0) {
+            return 'No se encontró texto suficiente en el PDF para armar un resumen.';
+        }
+
+        const adaptiveParagraphs = Math.max(2, Math.min(12, 1 + Math.floor(notesLength / 420)));
+
+        const userKeywords = this.extractKeywordsFromNotes(translatedNotes);
+
+        const tfidfScores = this.tfidf.scoreParagraphs(paragraphObjs, translatedNotes);
+        const vectorScores = this.vectors.scoreParagraphs(paragraphObjs, translatedNotes);
+
+        const weights = { tfidf: 0.72, vector: 0.28 };
         const combinedScores = this.combineScores(tfidfScores, vectorScores, weights, userKeywords);
-        
-        const topSentences = combinedScores
-            .slice(0, adaptiveSentences)
-            .sort((a, b) => a.index - b.index); // ✅ MANTENER ORDEN ORIGINAL DEL TEXTO
-        
-        const summary = this.buildCleanSummary(topSentences, adaptiveSentences);
-        
-        // ✅ DEBUG: Mostrar información en consola
-        console.log('📊 Resumen generado:');
-        console.log('   Longitud apuntes:', notesLength, 'caracteres');
-        console.log('   Oraciones seleccionadas:', adaptiveSentences);
-        console.log('   Oraciones en resumen:', topSentences.length);
-        
+
+        const minOverlap = notesLength > 500 ? 2 : 1;
+        const poolSize = Math.min(combinedScores.length, adaptiveParagraphs + 10);
+        const candidatePool = combinedScores.slice(0, poolSize);
+
+        let selected = candidatePool.filter(
+            p => (p.noteTokenMatches >= minOverlap) || (p.userBonus >= 1.6)
+        );
+        if (selected.length < 2) {
+            selected = candidatePool.filter(p => p.noteTokenMatches >= 1 || p.userBonus > 0);
+        }
+        if (selected.length < 2) {
+            selected = combinedScores.slice(0, Math.min(5, combinedScores.length));
+        }
+
+        selected = selected.slice(0, adaptiveParagraphs).sort((a, b) => a.index - b.index);
+
+        const summary = this.buildCleanSummary(selected);
+
+        console.log('📊 Resumen local (párrafos):');
+        console.log('   Apuntes (chars):', notesLength);
+        console.log('   Párrafos candidatos en PDF:', paragraphObjs.length);
+        console.log('   Párrafos incluidos:', selected.length);
+
         this.history.add({
             title: `Resumen ${new Date().toLocaleDateString()}`,
             content: summary,
@@ -580,100 +692,54 @@ class SummaryEngine {
             date: new Date().toISOString(),
             processingTime: Date.now()
         });
-        
+
         return summary;
     }
     
     combineScores(tfidfScores, vectorScores, weights, userKeywords) {
         const combined = [];
-        
-        for (let i = 0; i < tfidfScores.length; i++) {
-            const tfidf = tfidfScores[i];
+
+        for (const tfidf of tfidfScores) {
             const vector = vectorScores.find(v => v.index === tfidf.index) || { score: 0 };
 
-            // ✅ BONO EXTRA POR COINCIDENCIA EXACTA CON TUS APUNTES
             let userMatchBonus = 0;
             const lowerSentence = tfidf.text.toLowerCase();
-            
+
             for (const keyword of userKeywords) {
                 if (lowerSentence.includes(keyword.toLowerCase())) {
                     userMatchBonus += 1.8;
                 }
             }
-            
+
             combined.push({
                 index: tfidf.index,
                 text: tfidf.text,
                 score: (tfidf.score * weights.tfidf) + (vector.score * weights.vector) + userMatchBonus,
                 tfidfScore: tfidf.score,
                 vectorScore: vector.score,
-                userBonus: userMatchBonus
+                userBonus: userMatchBonus,
+                noteTokenMatches: tfidf.matchCount || 0
             });
         }
-        
+
         return combined.sort((a, b) => b.score - a.score);
     }
 
     extractKeywordsFromNotes(notes) {
-        const tokens = tokenize(notes);
+        const plain = stripHtmlTags(notes);
+        const tokens = tokenize(plain);
         const stopwords = stopwordsES();
         const keywords = tokens.filter(w => !stopwords.has(w) && w.length > 3);
-        
-        return [...new Set(keywords)].slice(0, 25);
+
+        return [...new Set(keywords)].slice(0, 35);
+    }
+
+    buildCleanSummary(items) {
+        if (!items || items.length === 0) return '';
+        const sorted = [...items].sort((a, b) => a.index - b.index);
+        return sorted.map(s => s.text.trim()).join('\n\n').trim();
     }
     
-    buildCleanSummary(sentences, totalSentences) {
-        let summary = '';
-        
-        // ✅ AGRUPAR POR CONCEPTOS CLAVE (usando los keywords del usuario como títulos)
-        const userKeywords = this.extractKeywordsFromNotes(this.lastUserNotes || '');
-        
-        // Agrupar párrafos por keyword coincidente
-        const groups = {};
-        
-        for (const keyword of userKeywords) {
-            groups[keyword] = [];
-        }
-        groups['general'] = [];
-        
-        for (const sentence of sentences) {
-            const lowerText = sentence.text.toLowerCase();
-            let matched = false;
-            
-            for (const keyword of userKeywords) {
-                if (lowerText.includes(keyword.toLowerCase())) {
-                    groups[keyword].push(sentence.text);
-                    matched = true;
-                    break;
-                }
-            }
-            
-            if (!matched) {
-                groups['general'].push(sentence.text);
-            }
-        }
-        
-        // Construir resumen con títulos
-        for (const [keyword, paragraphs] of Object.entries(groups)) {
-            if (paragraphs.length === 0) continue;
-            
-            if (keyword !== 'general') {
-                summary += `\n═══ ${keyword.toUpperCase()} ═══\n\n`;
-            } else {
-                summary += `\n═══ INFORMACIÓN GENERAL ═══\n\n`;
-            }
-            
-            for (const paragraph of paragraphs) {
-                summary += `${paragraph}\n\n`;
-            }
-        }
-        
-        return summary.trim();
-    }
-    
-    setLastUserNotes(notes) {
-        this.lastUserNotes = notes;
-    }
 }
 
 // ==========================================
