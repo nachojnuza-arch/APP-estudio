@@ -295,11 +295,18 @@ window.GoogleDriveSync = {
                 
                 if (fileData.body) {
                     const parsedData = JSON.parse(fileData.body);
-                    
-                    // Sobrescribe el objeto global de app.js con lo que había en la nube
-                    appData = parsedData; 
-                    localStorage.setItem('studio_data_v2', JSON.stringify(appData));
-                    
+
+                    appData = parsedData;
+                    if (typeof saveData === 'function') {
+                        await saveData(false);
+                    } else {
+                        try {
+                            localStorage.setItem('studio_data_v2', JSON.stringify(appData));
+                        } catch (err) {
+                            console.error('No se pudo guardar workspace tras sync Drive', err);
+                        }
+                    }
+
                     if(typeof renderSubjects === 'function') renderSubjects();
                     
                     // Si el usuario tenía una nota u hoja en pantalla, actualiza el texto

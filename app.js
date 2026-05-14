@@ -30,8 +30,16 @@ const idb = {
     db: null,
     init() {
         return new Promise((resolve, reject) => {
-            const req = indexedDB.open('StudyStudioDB', 1);
-            req.onupgradeneeded = (e) => { e.target.result.createObjectStore('pdfs'); };
+            const req = indexedDB.open('StudyStudioDB', 2);
+            req.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains('pdfs')) {
+                    db.createObjectStore('pdfs');
+                }
+                if (!db.objectStoreNames.contains('workspace')) {
+                    db.createObjectStore('workspace');
+                }
+            };
             req.onsuccess = (e) => { this.db = e.target.result; resolve(); };
             req.onerror = () => reject('No se pudo abrir IndexedDB');
         });
@@ -56,31 +64,150 @@ const idb = {
             tx.objectStore('pdfs').delete(id);
             tx.oncomplete = resolve;
         });
+    },
+    /** Copia completa del workspace (JSON string); localStorage tiene ~5 MB y se llena con notas/imágenes. */
+    async putWorkspace(jsonString) {
+        return new Promise((resolve, reject) => {
+            if (!this.db.objectStoreNames.contains('workspace')) {
+                reject(new Error('workspace store missing'));
+                return;
+            }
+            const tx = this.db.transaction('workspace', 'readwrite');
+            tx.objectStore('workspace').put(jsonString, 'studio_data_v2');
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    },
+    async getWorkspace() {
+        return new Promise((resolve) => {
+            if (!this.db.objectStoreNames.contains('workspace')) {
+                resolve(null);
+                return;
+            }
+            const tx = this.db.transaction('workspace', 'readonly');
+            const req = tx.objectStore('workspace').get('studio_data_v2');
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => resolve(null);
+        });
+    },
+    async clearAllStores() {
+        return new Promise((resolve) => {
+            if (!this.db) {
+                resolve();
+                return;
+            }
+            const names = ['workspace', 'pdfs'];
+            let i = 0;
+            const step = () => {
+                if (i >= names.length) {
+                    resolve();
+                    return;
+                }
+                const name = names[i++];
+                if (!this.db.objectStoreNames.contains(name)) {
+                    step();
+                    return;
+                }
+                const tx = this.db.transaction(name, 'readwrite');
+                tx.objectStore(name).clear();
+                tx.oncomplete = step;
+                tx.onerror = step;
+            };
+            step();
+        });
     }
 };
 
 // ==========================================
 // 3. FUNCIONES DE DATOS Y SINCRONIZACIÓN
 // ==========================================
-function loadData() {
-    const saved = localStorage.getItem('studio_data_v2'); 
-    if (saved) {
-        try { 
-            appData = JSON.parse(saved); 
-            if (!appData.subjects) appData.subjects = [];
-            appData.subjects.forEach(sub => {
-                if (!sub.files) sub.files = [];
-            });
-        } catch(e) {}
-    } else {
-        appData = { subjects: [], notes: {} };
-        saveData(false);
-    }
+const LS_WORKSPACE_KEY = 'studio_data_v2';
+const LS_WORKSPACE_IDB_FLAG = 'studio_data_v2_idb';
+let _workspaceQuotaToastShown = false;
+
+function applyParsedAppData(parsed) {
+    appData = parsed;
+    if (!appData.subjects) appData.subjects = [];
+    appData.subjects.forEach(sub => {
+        if (!sub.files) sub.files = [];
+    });
+    if (!appData.notes) appData.notes = {};
 }
 
-function saveData(syncToDrive = true) {
-    localStorage.setItem('studio_data_v2', JSON.stringify(appData));
-    
+async function loadData() {
+    if (localStorage.getItem(LS_WORKSPACE_IDB_FLAG) === '1') {
+        const raw = await idb.getWorkspace();
+        if (raw) {
+            try {
+                applyParsedAppData(JSON.parse(raw));
+                return;
+            } catch (e) {
+                console.warn('Workspace en IndexedDB corrupto o ilegible', e);
+            }
+        }
+    }
+
+    const saved = localStorage.getItem(LS_WORKSPACE_KEY);
+    if (saved) {
+        try {
+            applyParsedAppData(JSON.parse(saved));
+            idb.putWorkspace(saved).catch(() => {});
+            return;
+        } catch (e) {
+            console.warn('studio_data_v2 en localStorage ilegible', e);
+        }
+    }
+
+    const idbRaw = await idb.getWorkspace();
+    if (idbRaw) {
+        try {
+            applyParsedAppData(JSON.parse(idbRaw));
+            try {
+                localStorage.setItem(LS_WORKSPACE_IDB_FLAG, '1');
+            } catch (e) { /* ignore */ }
+            return;
+        } catch (e) {
+            console.warn('Fallback IndexedDB falló', e);
+        }
+    }
+
+    appData = { subjects: [], notes: {} };
+    await saveData(false);
+}
+
+async function saveData(syncToDrive = true) {
+    const serialized = JSON.stringify(appData);
+    try {
+        await idb.putWorkspace(serialized);
+    } catch (e) {
+        console.error('No se pudo guardar el workspace en IndexedDB', e);
+        if (typeof showToast === 'function') {
+            showToast('No se pudo guardar: falló IndexedDB. Revisá espacio en disco del navegador.', 'error');
+        }
+        return;
+    }
+
+    try {
+        localStorage.setItem(LS_WORKSPACE_KEY, serialized);
+        try {
+            localStorage.removeItem(LS_WORKSPACE_IDB_FLAG);
+        } catch (e) { /* ignore */ }
+    } catch (e) {
+        const quota = e && (e.name === 'QuotaExceededError' || e.code === 22);
+        if (quota) {
+            try {
+                localStorage.removeItem(LS_WORKSPACE_KEY);
+                localStorage.setItem(LS_WORKSPACE_IDB_FLAG, '1');
+            } catch (e2) { /* ignore */ }
+            if (!_workspaceQuotaToastShown && typeof showToast === 'function') {
+                _workspaceQuotaToastShown = true;
+                showToast('Memoria del navegador llena (~5 MB): tus datos siguen guardados en almacenamiento extendido y en Drive si está conectado.', 'info');
+            }
+        } else {
+            console.error('localStorage:', e);
+        }
+    }
+
     if (syncToDrive && window.GoogleDriveSync && window.GoogleDriveSync.isLoggedIn) {
         const saveStatus = document.getElementById('save-status');
         if(saveStatus) saveStatus.innerHTML = '<i class="fas fa-sync fa-spin text-blue-500"></i> Sincronizando...';
@@ -102,7 +229,7 @@ function saveCurrentNotes() {
     const editor = document.getElementById('notes-editor');
     if (currentState.currentFileId && editor) { 
         appData.notes[currentState.currentFileId] = editor.innerHTML; 
-        saveData(); 
+        saveData().catch((err) => console.error('saveData', err));
     }
 }
 
@@ -182,10 +309,14 @@ function toggleReadingFilter() {
 }
 
 function clearAllData() {
-    if(confirm('¿Borrar TODO permanentemente? Esta acción no se puede deshacer.')) {
-        localStorage.clear();
-        appData = { subjects: [], notes: {} };
-        location.reload();
+    if (confirm('¿Borrar TODO permanentemente? Esta acción no se puede deshacer.')) {
+        idb.clearAllStores().finally(() => {
+            try {
+                localStorage.clear();
+            } catch (e) { /* ignore */ }
+            appData = { subjects: [], notes: {} };
+            location.reload();
+        });
     }
 }
 
@@ -688,7 +819,7 @@ function exportNotesAsDocx() {
 // ==========================================
 window.addEventListener('DOMContentLoaded', async () => {
     await idb.init();
-    loadData();
+    await loadData();
     
     showEmptyState();
     renderSubjects();
