@@ -447,10 +447,10 @@
                     `;
                     
                     // Apunte general
-                    const isGenActive = currentState.currentFileId === ('gen_' + sub.id);
+                    const isSubjectNotesActive = currentState.currentSubject === sub.id && !currentState.currentFileId;
                     html += `
-                        <li class="flex items-center gap-2 pl-2 pr-1 py-1.5 text-xs rounded-md cursor-pointer transition-colors ${isGenActive ? 'bg-primary-50 text-primary-700 font-medium' : 'text-slate-500 hover:bg-slate-100 hover:text-primary-600'}" onclick="openGeneralNotes('${sub.id}')">
-                            <i class="fas fa-pen-nib text-[12px] opacity-70"></i> <span class="truncate">Apuntes Generales</span>
+                        <li class="flex items-center gap-2 pl-2 pr-1 py-1.5 text-xs rounded-md cursor-pointer transition-colors ${isSubjectNotesActive ? 'bg-primary-50 text-primary-700 font-medium' : 'text-slate-500 hover:bg-slate-100 hover:text-primary-600'}" onclick="openGeneralNotes('${sub.id}')">
+                            <i class="fas fa-pen-nib text-[12px] opacity-70"></i> <span class="truncate">Apuntes</span>
                         </li>
                     `;
 
@@ -477,7 +477,7 @@
             document.getElementById('media-viewer').classList.toggle('flex', !isNotes);
             document.getElementById('view-notes').classList.toggle('hidden', !isNotes);
             document.getElementById('view-notes').classList.toggle('flex', isNotes);
-            if (isNotes && typeof saveCurrentNotes === 'function') saveCurrentNotes();
+            if (typeof saveCurrentNotes === 'function') saveCurrentNotes(!isNotes);
         }
     </script>
 

@@ -223,6 +223,58 @@ window.GoogleDriveSync = {
         }
     },
 
+    escapeDriveQuery(value) {
+        return String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    },
+
+    async findFolderInParent(parentId, name) {
+        const safeName = this.escapeDriveQuery(name);
+        const response = await gapi.client.request({
+            path: 'https://www.googleapis.com/drive/v3/files',
+            params: {
+                q: `name='${safeName}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+                fields: 'files(id, name)',
+                pageSize: 1
+            }
+        });
+        const files = response.result.files || [];
+        return files.length > 0 ? files[0].id : null;
+    },
+
+    /** Carpeta en Drive con el nombre de la materia (dentro de APP Estudio - Datos). */
+    async ensureSubjectFolder(subject) {
+        if (!this.folderId || !subject) return null;
+        if (subject.driveFolderId) return subject.driveFolderId;
+
+        const existingId = await this.findFolderInParent(this.folderId, subject.name);
+        if (existingId) {
+            subject.driveFolderId = existingId;
+            return existingId;
+        }
+
+        const createRes = await gapi.client.request({
+            path: 'https://www.googleapis.com/drive/v3/files',
+            method: 'POST',
+            body: {
+                name: subject.name,
+                mimeType: 'application/vnd.google-apps.folder',
+                parents: [this.folderId]
+            }
+        });
+        subject.driveFolderId = createRes.result.id;
+        return subject.driveFolderId;
+    },
+
+    async ensureAllSubjectFolders() {
+        if (!this.folderId || typeof appData === 'undefined' || !appData.subjects) return;
+        for (const sub of appData.subjects) {
+            await this.ensureSubjectFolder(sub);
+        }
+        if (typeof saveData === 'function') {
+            await saveData(false);
+        }
+    },
+
     logout() {
         this.clearStoredCredentials();
         this.updateUI();
@@ -251,6 +303,7 @@ window.GoogleDriveSync = {
                 this.folderId = response.result.files[0].id;
                 console.log("Carpeta de Drive conectada.");
                 await this.syncAppDataFromDrive();
+                await this.ensureAllSubjectFolders();
             } else {
                 // No existe: creamos la carpeta
                 let createRes = await gapi.client.request({
@@ -265,7 +318,10 @@ window.GoogleDriveSync = {
                 console.log("Carpeta de Drive creada.");
                 
                 // Si la app local ya tenía datos (materias/apuntes), hacemos la primera copia de seguridad
-                if(typeof appData !== 'undefined') await this.syncAppDataToDrive(appData);
+                if (typeof appData !== 'undefined') {
+                    await this.syncAppDataToDrive(appData);
+                    await this.ensureAllSubjectFolders();
+                }
             }
         } catch(e) { 
             console.error("Fallo al inicializar la carpeta de Drive", e); 
@@ -310,9 +366,12 @@ window.GoogleDriveSync = {
                     if(typeof renderSubjects === 'function') renderSubjects();
                     
                     // Si el usuario tenía una nota u hoja en pantalla, actualiza el texto
-                    if (typeof currentState !== 'undefined' && currentState.currentFileId) {
+                    if (typeof currentState !== 'undefined' && currentState.currentSubject) {
                         const editor = document.getElementById('notes-editor');
-                        if(editor) editor.innerHTML = appData.notes[currentState.currentFileId] || '';
+                        const key = typeof getSubjectNotesKey === 'function'
+                            ? getSubjectNotesKey(currentState.currentSubject)
+                            : ('sub_' + currentState.currentSubject);
+                        if (editor) editor.innerHTML = appData.notes[key] || '';
                     }
                     if(typeof showToast === 'function') showToast('Apuntes sincronizados desde la nube', 'success');
                 }
@@ -374,14 +433,17 @@ window.GoogleDriveSync = {
         }
     },
     
-    // 7. Sube el PDF a la carpeta de Drive (Se ejecuta al añadir un archivo)
-    async uploadPdfToDrive(fileBlob, fileName) {
+    // 7. Sube el PDF a la carpeta de la materia en Drive
+    async uploadPdfToDrive(fileBlob, fileName, subject) {
         if (!this.folderId) return null;
         try {
+            const parentId = subject ? await this.ensureSubjectFolder(subject) : this.folderId;
+            if (!parentId) return null;
+
             const metadata = { 
                 name: fileName + '.pdf', 
                 mimeType: 'application/pdf', 
-                parents: [this.folderId] 
+                parents: [parentId] 
             };
             const form = new FormData();
             form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));

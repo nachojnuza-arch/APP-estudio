@@ -17,6 +17,7 @@ let currentState = {
 
 let autoSaveTimer = null;
 let driveSyncTimer = null;
+const AUTO_SAVE_IDLE_MS = 60_000;
 let screenshotState = { active: false, startX: 0, startY: 0, endX: 0, endY: 0 };
 
 // Variables de estado para la IA (por si interactúan con los otros scripts)
@@ -125,6 +126,41 @@ const LS_WORKSPACE_KEY = 'studio_data_v2';
 const LS_WORKSPACE_IDB_FLAG = 'studio_data_v2_idb';
 let _workspaceQuotaToastShown = false;
 
+function getSubjectNotesKey(subId) {
+    return 'sub_' + subId;
+}
+
+function getSubjectNotesHtml(subId) {
+    return appData.notes[getSubjectNotesKey(subId)] || '';
+}
+
+/** Une apuntes viejos (por archivo / gen_) en una sola hoja por materia. */
+function migrateNotesToPerSubject() {
+    if (!appData.notes) appData.notes = {};
+    appData.subjects.forEach(sub => {
+        const key = getSubjectNotesKey(sub.id);
+        if (appData.notes[key]) return;
+
+        let merged = '';
+        const genKey = 'gen_' + sub.id;
+        if (appData.notes[genKey]) merged = appData.notes[genKey];
+
+        sub.files.forEach(f => {
+            const part = appData.notes[f.id];
+            if (!part) return;
+            if (merged && merged.trim()) {
+                merged += '<hr><p><br></p>' + part;
+            } else {
+                merged = part;
+            }
+            delete appData.notes[f.id];
+        });
+
+        if (merged) appData.notes[key] = merged;
+        delete appData.notes[genKey];
+    });
+}
+
 function applyParsedAppData(parsed) {
     appData = parsed;
     if (!appData.subjects) appData.subjects = [];
@@ -132,6 +168,7 @@ function applyParsedAppData(parsed) {
         if (!sub.files) sub.files = [];
     });
     if (!appData.notes) appData.notes = {};
+    migrateNotesToPerSubject();
 }
 
 async function loadData() {
@@ -175,7 +212,26 @@ async function loadData() {
     await saveData(false);
 }
 
-async function saveData(syncToDrive = true) {
+async function flushDriveSync() {
+    if (!window.GoogleDriveSync || !window.GoogleDriveSync.isLoggedIn || !window.GoogleDriveSync.folderId) {
+        return;
+    }
+    clearTimeout(driveSyncTimer);
+    const saveStatus = document.getElementById('save-status');
+    if (saveStatus) saveStatus.innerHTML = '<i class="fas fa-sync fa-spin text-blue-500"></i> Sincronizando...';
+    try {
+        await window.GoogleDriveSync.syncAppDataToDrive(appData);
+        if (saveStatus) {
+            saveStatus.innerHTML = '<i class="fas fa-cloud-check text-emerald-500"></i> Drive';
+            setTimeout(() => { saveStatus.innerHTML = '<i class="fas fa-check text-green-500"></i> Guardado'; }, 2000);
+        }
+    } catch (err) {
+        console.error('flushDriveSync', err);
+    }
+}
+
+async function saveData(syncToDrive = true, options = {}) {
+    const { forceDrive = false } = options;
     const serialized = JSON.stringify(appData);
     try {
         await idb.putWorkspace(serialized);
@@ -209,27 +265,34 @@ async function saveData(syncToDrive = true) {
     }
 
     if (syncToDrive && window.GoogleDriveSync && window.GoogleDriveSync.isLoggedIn) {
-        const saveStatus = document.getElementById('save-status');
-        if(saveStatus) saveStatus.innerHTML = '<i class="fas fa-sync fa-spin text-blue-500"></i> Sincronizando...';
-        
-        clearTimeout(driveSyncTimer);
-        driveSyncTimer = setTimeout(() => {
-            window.GoogleDriveSync.syncAppDataToDrive(appData).then(() => {
-                if(saveStatus) {
-                    saveStatus.innerHTML = '<i class="fas fa-cloud-check text-emerald-500"></i> Drive';
-                    setTimeout(() => { saveStatus.innerHTML = '<i class="fas fa-check text-green-500"></i> Guardado'; }, 2000);
-                }
-            });
-        }, 3000); 
+        if (forceDrive) {
+            await flushDriveSync();
+        } else {
+            const saveStatus = document.getElementById('save-status');
+            if (saveStatus) saveStatus.innerHTML = '<i class="fas fa-sync fa-spin text-blue-500"></i> Sincronizando...';
+
+            clearTimeout(driveSyncTimer);
+            driveSyncTimer = setTimeout(() => {
+                window.GoogleDriveSync.syncAppDataToDrive(appData).then(() => {
+                    if (saveStatus) {
+                        saveStatus.innerHTML = '<i class="fas fa-cloud-check text-emerald-500"></i> Drive';
+                        setTimeout(() => { saveStatus.innerHTML = '<i class="fas fa-check text-green-500"></i> Guardado'; }, 2000);
+                    }
+                });
+            }, 3000);
+        }
     }
 }
 
-// CORRECCIÓN: Guardar notas usando el ID del archivo (currentFileId) para que sean independientes
-function saveCurrentNotes() {
+/** Una hoja de apuntes por materia (clave sub_ID). forceDrive: subida inmediata a Drive. */
+async function saveCurrentNotes(forceDrive = false) {
     const editor = document.getElementById('notes-editor');
-    if (currentState.currentFileId && editor) { 
-        appData.notes[currentState.currentFileId] = editor.innerHTML; 
-        saveData().catch((err) => console.error('saveData', err));
+    if (!currentState.currentSubject || !editor) return;
+    appData.notes[getSubjectNotesKey(currentState.currentSubject)] = editor.innerHTML;
+    try {
+        await saveData(true, { forceDrive });
+    } catch (err) {
+        console.error('saveData', err);
     }
 }
 
@@ -348,7 +411,7 @@ function renderSubjects() {
             </li>`
         }).join('');
 
-        const isGenActive = currentState.currentFileId === ('gen_' + sub.id);
+        const isSubjectNotesActive = currentState.currentSubject === sub.id && !currentState.currentFileId;
 
         li.innerHTML = `
             <div class="flex items-center justify-between p-2 cursor-pointer hover:bg-slate-800 rounded-lg transition-colors" onclick="toggleSubjectAccordion('${sub.id}')">
@@ -356,7 +419,7 @@ function renderSubjects() {
                 <i class="fas fa-chevron-${isExpanded ? 'down' : 'right'} text-xs text-slate-500 hide-on-collapse"></i>
             </div>
             <ul class="${isExpanded ? 'block' : 'hidden'} ml-4 pl-2 border-l border-slate-700 mt-1 space-y-1 hide-on-collapse">
-                <li class="group cursor-pointer rounded-lg flex items-center p-2 transition-colors ${isGenActive ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 text-slate-300'}" onclick="openGeneralNotes('${sub.id}')"><i class="fas fa-pen-nib w-5 text-center text-xs opacity-70 flex-shrink-0"></i><span class="text-xs truncate">Apuntes Generales</span></li>
+                <li class="group cursor-pointer rounded-lg flex items-center p-2 transition-colors ${isSubjectNotesActive ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 text-slate-300'}" onclick="openGeneralNotes('${sub.id}')"><i class="fas fa-pen-nib w-5 text-center text-xs opacity-70 flex-shrink-0"></i><span class="text-xs truncate">Apuntes</span></li>
                 ${filesHtml}
             </ul>`;
         list.appendChild(li);
@@ -370,29 +433,36 @@ function renderSubjects() {
 
 function toggleSubjectAccordion(subId) { currentState.expandedSubjects[subId] = !currentState.expandedSubjects[subId]; renderSubjects(); }
 
-function addSubject() {
+async function addSubject() {
     const name = document.getElementById('new-subject-name').value.trim();
     if (!name) return;
     const subId = 'sub_' + Date.now().toString(36);
-    appData.subjects.push({ id: subId, name, icon: 'fa-book', files: [] });
-    saveData(); document.getElementById('new-subject-name').value = '';
-    renderManageSubjects(); renderSubjects(); openGeneralNotes(subId);
+    const newSub = { id: subId, name, icon: 'fa-book', files: [], driveFolderId: null };
+    appData.subjects.push(newSub);
+    if (window.GoogleDriveSync && window.GoogleDriveSync.isLoggedIn) {
+        await window.GoogleDriveSync.ensureSubjectFolder(newSub);
+    }
+    await saveData();
+    document.getElementById('new-subject-name').value = '';
+    renderManageSubjects();
+    renderSubjects();
+    openGeneralNotes(subId);
     showToast('Materia añadida', 'success');
 }
 
-function removeSubject(subId) {
-    if(confirm('¿Eliminar materia y todos sus apuntes?')) {
-        const sub = appData.subjects.find(s => s.id === subId);
-        
-        // Limpiar todas las notas asociadas
-        if (sub) {
-            sub.files.forEach(f => delete appData.notes[f.id]);
+async function removeSubject(subId) {
+    if (confirm('¿Eliminar materia y todos sus apuntes?')) {
+        if (currentState.currentSubject === subId) {
+            await saveCurrentNotes(true);
         }
+        delete appData.notes[getSubjectNotesKey(subId)];
         delete appData.notes['gen_' + subId];
-        
+
         appData.subjects = appData.subjects.filter(s => s.id !== subId);
-        saveData(); renderManageSubjects(); renderSubjects();
-        if(currentState.currentSubject === subId) showEmptyState();
+        await saveData();
+        renderManageSubjects();
+        renderSubjects();
+        if (currentState.currentSubject === subId) showEmptyState();
     }
 }
 
@@ -426,8 +496,8 @@ async function confirmAddFile() {
         
         if (window.GoogleDriveSync && window.GoogleDriveSync.isLoggedIn) {
             showToast('Subiendo respaldo a Drive...', 'info');
-            window.GoogleDriveSync.uploadPdfToDrive(file, fileObj.name).then(dId => {
-                if(dId) { fileObj.driveId = dId; saveData(); renderSubjects(); }
+            window.GoogleDriveSync.uploadPdfToDrive(file, fileObj.name, sub).then(dId => {
+                if (dId) { fileObj.driveId = dId; saveData(); renderSubjects(); }
             });
         }
     } else {
@@ -444,17 +514,16 @@ async function confirmAddFile() {
 
 async function removeFile(e, subId, fileId) {
     e.stopPropagation();
-    if(confirm('¿Eliminar archivo y sus apuntes asociados?')) {
+    if (confirm('¿Eliminar este archivo? Los apuntes de la materia se conservan.')) {
         await idb.delete(fileId);
         const sub = appData.subjects.find(s => s.id === subId);
         sub.files = sub.files.filter(f => f.id !== fileId);
-        delete appData.notes[fileId]; // Limpiar notas del archivo
-        
-        // Limpiar de aiSourceFileIds si estaba seleccionado
+
         if (aiSourceFileIds.has(fileId)) aiSourceFileIds.delete(fileId);
-        
-        saveData(); renderSubjects();
-        if(currentState.currentFileId === fileId) showEmptyState();
+
+        await saveData();
+        renderSubjects();
+        if (currentState.currentFileId === fileId) showEmptyState();
     }
 }
 
@@ -512,7 +581,10 @@ function toggleAiSource(fileId) {
 // ==========================================
 // 6. VISOR DE PDF, NOTAS Y NAVEGACIÓN
 // ==========================================
-function showEmptyState() {
+async function showEmptyState() {
+    if (currentState.currentSubject) {
+        await saveCurrentNotes(true);
+    }
     document.getElementById('pdf-container').classList.add('hidden');
     document.getElementById('video-container').classList.add('hidden');
     document.getElementById('pdf-controls').classList.add('hidden');
@@ -545,16 +617,16 @@ function showEmptyState() {
     }
 }
 
-// CORRECCIÓN: Las notas generales cargan mediante el ID 'gen_IDMATERIA'
-function openGeneralNotes(subId) {
-    saveCurrentNotes(); 
-    
+// Una sola hoja de apuntes por materia (sub_ID)
+async function openGeneralNotes(subId) {
+    await saveCurrentNotes(true);
+
     const sub = appData.subjects.find(s => s.id === subId);
-    currentState.currentSubject = subId; 
-    currentState.currentFileId = 'gen_' + subId; 
-    
+    currentState.currentSubject = subId;
+    currentState.currentFileId = null;
+
     document.getElementById('header-title').textContent = `Apuntes: ${sub.name}`;
-    document.getElementById('notes-editor').innerHTML = appData.notes[currentState.currentFileId] || '';
+    document.getElementById('notes-editor').innerHTML = getSubjectNotesHtml(subId);
     
     document.getElementById('empty-state').classList.add('hidden');
     document.getElementById('pdf-container').classList.add('hidden');
@@ -566,7 +638,7 @@ function openGeneralNotes(subId) {
         dashboard.classList.remove('hidden');
         let html = `<div class="max-w-5xl mx-auto">`;
         html += `<h2 class="text-2xl md:text-3xl font-bold text-slate-800 mb-2">Recursos de ${sub.name}</h2>`;
-        html += `<p class="text-slate-500 mb-8">Selecciona un documento para abrirlo o usa el editor de la derecha para notas generales.</p>`;
+        html += `<p class="text-slate-500 mb-8">Selecciona un documento para abrirlo. Los apuntes de la derecha son los mismos para toda la materia.</p>`;
         html += `<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">`;
         
         if (sub.files.length === 0) {
@@ -589,18 +661,17 @@ function openGeneralNotes(subId) {
     renderSubjects();
 }
 
-// CORRECCIÓN: Los apuntes de PDF cargan usando el ID del archivo
 async function openFile(subId, fileId) {
-    saveCurrentNotes(); 
-    
+    await saveCurrentNotes(true);
+
     const sub = appData.subjects.find(s => s.id === subId);
     const file = sub.files.find(f => f.id === fileId);
-    
-    currentState.currentSubject = subId; 
-    currentState.currentFileId = fileId; 
-    
+
+    currentState.currentSubject = subId;
+    currentState.currentFileId = fileId;
+
     document.getElementById('header-title').textContent = file.name;
-    document.getElementById('notes-editor').innerHTML = appData.notes[fileId] || '';
+    document.getElementById('notes-editor').innerHTML = getSubjectNotesHtml(subId);
     
     const sidebar = document.getElementById('sidebar');
     if (window.innerWidth < 768) {
@@ -841,7 +912,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('notes-editor').addEventListener('input', () => {
         clearTimeout(autoSaveTimer);
-        autoSaveTimer = setTimeout(saveCurrentNotes, 1500);
+        autoSaveTimer = setTimeout(() => saveCurrentNotes(false), AUTO_SAVE_IDLE_MS);
         
         const editor = document.getElementById('notes-editor');
         const selection = window.getSelection();
@@ -908,10 +979,12 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Guardar inmediatamente si el usuario cambia de pestaña o cierra el navegador
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
-            saveCurrentNotes();
+            saveCurrentNotes(true);
         }
+    });
+    window.addEventListener('pagehide', () => {
+        saveCurrentNotes(true);
     });
 });
