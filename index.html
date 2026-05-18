@@ -1,4 +1,4 @@
-﻿<html lang="es"><head>
+<html lang="es"><head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="EstudIA: Tu aplicación inteligente para tomar apuntes sobre documentos y videos.">
@@ -142,9 +142,7 @@
                 <button type="button" onclick="toggleReadingFilter()" class="w-9 h-9 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-400 transition-colors" id="reading-filter-btn" title="Modo Lectura">
                     <i class="fas fa-eye text-sm"></i>
                 </button>
-                <button type="button" onclick="openApiModal()" class="w-9 h-9 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-400" title="Configurar IA">
-                    <i class="fas fa-sliders text-sm"></i>
-                </button>
+                <!-- Botón IA removido ya que la config es en backend -->
             </div>
         </header>
 
@@ -365,16 +363,7 @@
             </div>
         </div>
 
-        <!-- Modal: Configuración IA -->
-        <div id="api-modal" class="modal-container hidden bg-white rounded-2xl shadow-2xl w-[90%] max-w-sm overflow-hidden">
-            <div class="p-6 text-center space-y-4">
-                <div class="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center mx-auto text-primary-600 text-xl"><i class="fas fa-key"></i></div>
-                <h3 class="font-bold text-slate-800 text-lg">Google Gemini API</h3>
-                <input type="password" id="api-key-input" title="Clave de API" aria-label="Clave de API de Google Gemini" class="w-full border border-slate-200 p-3 rounded-xl text-center text-sm outline-none focus:border-primary-500" placeholder="AIza...">
-                <button type="button" onclick="saveApiKey()" class="w-full bg-primary-600 hover:bg-primary-700 text-white py-3 rounded-xl font-medium transition-colors">Guardar</button>
-                <button type="button" onclick="closeModal('api-modal')" class="text-xs text-slate-400 hover:text-slate-600">Cancelar</button>
-            </div>
-        </div>
+        <!-- Modal IA removido (ahora se usa Vercel Backend) -->
 
         <!-- Modal: Drive Login -->
         <div id="login-modal" class="modal-container hidden bg-white rounded-2xl shadow-2xl w-[90%] max-w-sm overflow-hidden">

@@ -1287,7 +1287,7 @@ const rateLimiter = new RateLimiter({
     minDelayMs: 6000       // 6 segundos entre requests
 });
 
-let geminiApiKey = null;
+// geminiApiKey eliminado para usar proxy
 let pendingAIFunction = null;
 
 // Plantillas compactas (ahorrar tokens)
@@ -1372,15 +1372,13 @@ hash = hash & hash;
 return hash.toString(36);
 }
 
-// 🆕 Detección dinámica del mejor modelo disponible según la API Key
+// 🆕 Detección dinámica del mejor modelo disponible (vía Vercel)
 let cachedBestModel = null;
-async function getBestModel(apiKey) {
+async function getBestModel() {
     if (cachedBestModel) return cachedBestModel;
-    const keyToUse = apiKey || geminiApiKey;
-    if (!keyToUse) return 'gemini-1.5-flash';
     
     try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${keyToUse}`);
+        const res = await fetch(`/api/gemini?path=models`);
         if (res.ok) {
             const data = await res.json();
             const bestModel = data.models.find(m => m.name.includes('gemini-2.5-flash') && m.supportedGenerationMethods?.includes('generateContent')) ||
@@ -1394,7 +1392,7 @@ async function getBestModel(apiKey) {
                 return cachedBestModel;
             }
         }
-    } catch(e) { console.warn("⚠️ Fallo la obtención de modelos.", e); }
+    } catch(e) { console.warn("⚠️ Fallo la obtención de modelos vía proxy.", e); }
     return 'gemini-1.5-flash';
 }
 
@@ -1405,20 +1403,13 @@ if (!chat) return;
 
 chat.innerHTML += `<div class="msg-user p-2 text-xs text-slate-500 self-end max-w-[85%] rounded-l-xl rounded-tr-xl bg-slate-200">🔍 Diagnóstico de API...</div>`;
 
-const apiKey = localStorage.getItem('gemini_api_key');
 let html = '<div class="p-3 bg-slate-800 text-slate-200 text-xs rounded-lg space-y-1 font-mono">';
-
-if (!apiKey) {
-html += `<div class="text-red-400">❌ No hay API key guardada</div>`;
-} else {
-const masked = apiKey.slice(0, 8) + '...' + apiKey.slice(-4);
-html += `<div class="text-green-400">✅ API key: ${masked}</div>`;
-}
+html += `<div class="text-green-400">✅ Usando endpoint de Vercel (/api/gemini)</div>`;
 
 // Test directo con modelo fijo (1 sola request)
-    const testModel = await getBestModel(apiKey);
+    const testModel = await getBestModel();
 try {
-const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${testModel}:generateContent?key=${apiKey}`, {
+const res = await fetch(`/api/gemini?path=models/${testModel}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -1435,9 +1426,6 @@ if (res.ok) {
 } else if (res.status === 429) {
     html += `<div class="text-red-400">❌ 429 - Rate limit activo en ${testModel}</div>`;
     html += `<div class="text-yellow-400">⏳ Esperá 2-5 min sin hacer requests</div>`;
-    html += `<div class="text-yellow-400">💡 O creá una key nueva en aistudio.google.com</div>`;
-} else if (res.status === 403 || res.status === 400) {
-    html += `<div class="text-red-400">❌ ${res.status} - API key inválida</div>`;
 } else {
     html += `<div class="text-red-400">❌ ${res.status} ${res.statusText}</div>`;
 }
@@ -1500,7 +1488,7 @@ throw new Error(`⏱ Rate limit activo. Esperá ${remaining}s más.`);
 return rateLimiter.execute(async () => {
 let lastError;
 
-const dynamicModel = await getBestModel(geminiApiKey);
+const dynamicModel = await getBestModel();
 const fallbackModels = [dynamicModel, 'gemini-1.5-flash-8b', 'gemini-1.5-flash'];
 
 for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -1513,7 +1501,7 @@ for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
 
             // 🆕 Rotar entre modelos automáticamente si alguno devuelve 404
             const model = fallbackModels[attempt % fallbackModels.length];
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
+        const url = `/api/gemini?path=models/${model}:generateContent`;
 
         const body = {
             contents: [{ parts: [{ text: prompt }] }],
@@ -1548,8 +1536,7 @@ for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
 
         // ── Otros errores ──
         if (response.status === 400 || response.status === 403) {
-            localStorage.removeItem('gemini_api_key');
-            throw new Error('🔑 Clave API inválida. Revisá Configuración IA ⚙️');
+            throw new Error('🔑 Error en la API (400/403). Revisá la configuración en Vercel.');
         }
         if (!response.ok) throw new Error(`Error del servidor (${response.status})`);
 
@@ -1600,36 +1587,16 @@ return temp.textContent || temp.innerText;
 }
 
 function openApiModal() {
-    const existingKey = localStorage.getItem('gemini_api_key');
-    if (existingKey) document.getElementById('api-key-input').value = existingKey;
-    openModal('api-modal');
+    showToast('La IA ahora se configura de forma segura desde el backend (Vercel).', 'info');
 }
 
 function requireApiKey(callback) {
-    geminiApiKey = localStorage.getItem('gemini_api_key');
-    if (geminiApiKey && geminiApiKey.length > 10) {
-        callback();
-    } else {
-        pendingAIFunction = callback;
-        openApiModal();
-    }
+    // Ya no requerimos API key local, llamamos al callback directamente.
+    if (callback) callback();
 }
 
 function saveApiKey() {
-    const key = document.getElementById('api-key-input').value.trim();
-    if (key) {
-        localStorage.setItem('gemini_api_key', key);
-        geminiApiKey = key;
-        cachedBestModel = null; // 🆕 Limpiamos caché para forzar redetección si cambió la clave
-        closeModal('api-modal');
-        if (pendingAIFunction) {
-            pendingAIFunction();
-            pendingAIFunction = null;
-        }
-        showToast('✅ Clave IA guardada', 'success');
-    } else {
-        showToast('⚠️ Ingresa una clave válida', 'error');
-    }
+    closeModal('api-modal');
 }
 
 function formatMarkdownToHtml(text) {

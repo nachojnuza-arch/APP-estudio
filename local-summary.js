@@ -784,11 +784,8 @@ class SummaryHistory {
 // IA PARA REORDENAR Y HACER LEGIBLE EL RESUMEN
 // ==========================================
 async function callAIForSummary(extractedText, userNotes) {
-    // Leer API keys desde el archivo APIKEY.env (simulado en cliente)
-    // Usamos Gemini API (gratuita y rápida)
-    
-    const API_KEY = 'AIzaSyAgCKSxLz6ndZblOrhZkhi0DYTlmaQnwSk'; // Gemini
-    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
+    // Usamos nuestra API de Vercel (protege la API Key)
+    const API_URL = `/api/gemini?path=models/gemini-2.0-flash:generateContent`;
     
     const prompt = `Eres un asistente médico experto en crear resúmenes de estudio.
 
