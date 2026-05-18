@@ -2143,10 +2143,17 @@ async function generarResumenDirecto() {
             // Usar el sistema de resúmenes locales
             const summaryText = window.LocalSummary.generate(combinedText, userNotes, 'PRECISE');
 
-            // Formatear para HTML
+            // Formatear para HTML con diseño de tarjetas
+            const paragraphsHtml = summaryText.split('\n\n').map(p => {
+                if (!p.trim()) return '';
+                const isBullet = p.trim().startsWith('🔹');
+                const style = isBullet ? "text-slate-700 bg-white p-5 rounded-xl border border-slate-200 shadow-sm mb-4 leading-relaxed" : "text-slate-700 mb-4";
+                return `<p class="${style}">${p}</p>`;
+            }).join('');
+
             const htmlContent = `
-                <div class="prose prose-emerald max-w-none">
-                    ${summaryText.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>')}
+                <div class="max-w-none bg-slate-50 p-2 rounded-lg">
+                    ${paragraphsHtml}
                 </div>
             `;
 

@@ -34,14 +34,15 @@ class SummaryEngine {
         const poolSize = Math.min(combinedScores.length, adaptiveParagraphs + 10);
         const candidatePool = combinedScores.slice(0, poolSize);
 
-        // SOLO incluir párrafos que tengan coincidencia real con los apuntes del usuario
+        // SOLO incluir párrafos que tengan coincidencia fuerte y real con los apuntes del usuario
         let selected = candidatePool.filter(
-            p => (p.noteTokenMatches >= minOverlap) || (p.userBonus >= 1.6)
+            p => (p.noteTokenMatches >= minOverlap + 1) || (p.userBonus >= 3.0) || (p.vectorScore > 0.4)
         );
         
-        // Si somos muy estrictos, relajamos un poco pero EXIGIENDO al menos 1 coincidencia
+        // Si somos muy estrictos, relajamos un poco pero EXIGIENDO al menos 2 coincidencias claras
+        // Esto evita que párrafos como la dedicatoria del libro se incluyan por tener 1 sola palabra en común ("diagnóstico")
         if (selected.length < 2) {
-            selected = candidatePool.filter(p => p.noteTokenMatches >= 1 || p.userBonus > 0);
+            selected = candidatePool.filter(p => p.noteTokenMatches >= 2 || (p.noteTokenMatches >= 1 && p.vectorScore > 0.25));
         }
         
         // Si no hay ninguna coincidencia real, retornamos un mensaje en vez de rellenar con basura
