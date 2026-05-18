@@ -109,9 +109,13 @@ class FastTFIDF {
             .filter(p => {
                 if (p.length < 150 || p.length > 14000) return false;
                 
-                // Excluir glosarios, índices, tablas de contenido o bibliografía
-                const glossaryPatterns = /(?:ABREVIATURAS|GLOSARIO|SIGLAS|CUADRO|TABLA|REFERENCIAS|BIBLIOGRAFÍA|ÍNDICE|APÉNDICE|CONTENIDO|ÍNDICE TEMÁTICO)/i;
+                // Excluir glosarios, índices, tablas de contenido, bibliografía, dedicatorias
+                const glossaryPatterns = /(?:ABREVIATURAS|GLOSARIO|SIGLAS|CUADRO|TABLA|REFERENCIAS|BIBLIOGRAFÍA|ÍNDICE|APÉNDICE|CONTENIDO|ÍNDICE TEMÁTICO|DEDICATORIA|AGRADECIMIENTO)/i;
                 if (glossaryPatterns.test(p)) return false;
+
+                // Excluir dedicatorias o textos introductorios típicos
+                const introPatterns = /(?:dedicamos a|nuestras familias|nuestros alumnos|agradecemos|este libro es producto|este libro se lo dedicamos|práctica docente)/i;
+                if (introPatterns.test(p)) return false;
 
                 // Excluir líneas de índice típicas (ej. "Tema ...... 12" o "Tema ______ 12")
                 const indexLines = (p.match(/(\.{3,}|_{3,})\s*\d+/g) || []).length;
