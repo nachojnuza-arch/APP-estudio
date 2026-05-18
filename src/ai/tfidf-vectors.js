@@ -212,8 +212,8 @@ class FastTFIDF {
             .replace(/^.*?(?:\.{3,}|_{3,})\s*\d+.*$/gm, '')
             // Eliminar un solo salto de línea (unir líneas dentro del mismo párrafo), preservando los dobles
             .replace(/([^\n])\n([^\n])/g, '$1 $2')
-            // Eliminar múltiples espacios
-            .replace(/\s{2,}/g, ' ')
+            // Eliminar múltiples espacios (solo espacios y tabs, para preservar los saltos de línea vitales)
+            .replace(/[ \t]{2,}/g, ' ')
             // Eliminar paréntesis vacíos o con poco contenido
             .replace(/\([^)]{0,3}\)/g, '')
             .trim();
