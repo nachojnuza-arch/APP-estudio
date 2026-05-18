@@ -1,4 +1,4 @@
-﻿pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 // ==========================================
 // 1. CONFIGURACIÓN Y VARIABLES GLOBALES
@@ -889,8 +889,17 @@ function exportNotesAsDocx() {
 // 9. INICIALIZACIÓN
 // ==========================================
 window.addEventListener('DOMContentLoaded', async () => {
-    await idb.init();
-    await loadData();
+    try {
+        await idb.init();
+    } catch (e) {
+        console.warn("⚠️ No se pudo inicializar IndexedDB (posible modo incógnito o restricción del navegador). Los PDFs podrían no guardarse localmente.", e);
+    }
+    
+    try {
+        await loadData();
+    } catch (e) {
+        console.warn("⚠️ Error al cargar datos guardados:", e);
+    }
     
     showEmptyState();
     renderSubjects();

@@ -417,14 +417,36 @@ class FastTFIDF {
     splitParagraphs(text) {
         const normalized = text.replace(/\s+/g, ' ').trim();
         let blocks = text.split(/\n\s*\n+/).map(p => p.replace(/\s+/g, ' ').trim())
-            .filter(p => p.length >= 120 && p.length < 14000);
+            .filter(p => {
+                if (p.length < 150 || p.length > 14000) return false;
+                
+                // Excluir glosarios, índices, tablas de contenido o bibliografía
+                const glossaryPatterns = /(?:ABREVIATURAS|GLOSARIO|SIGLAS|CUADRO|TABLA|REFERENCIAS|BIBLIOGRAFÍA|ÍNDICE|APÉNDICE|CONTENIDO|ÍNDICE TEMÁTICO)/i;
+                if (glossaryPatterns.test(p)) return false;
+
+                // Excluir líneas de índice típicas (ej. "Tema ...... 12")
+                const indexLines = (p.match(/\.{3,}\s*\d+/g) || []).length;
+                if (indexLines > 2) return false;
+
+                // Excluir si no tiene oraciones desarrolladas
+                const sentenceCount = (p.match(/[.!?]+/g) || []).length;
+                if (sentenceCount < 2) return false; // Un párrafo completo suele tener al menos 2 oraciones
+                
+                return true;
+            });
+            
         if (blocks.length < 3) {
             const sentences = this.splitSentences(text);
             blocks = [];
             const step = 5;
             for (let i = 0; i < sentences.length; i += step) {
                 const chunk = sentences.slice(i, i + step).join(' ');
-                if (chunk.length >= 100) blocks.push(chunk);
+                if (chunk.length >= 150) {
+                    const sentenceCount = (chunk.match(/[.!?]+/g) || []).length;
+                    if (sentenceCount >= 2 && !(chunk.match(/\.{3,}\s*\d+/g) || []).length) {
+                        blocks.push(chunk);
+                    }
+                }
             }
         }
         if (blocks.length === 0 && normalized.length >= 100) {
@@ -666,14 +688,19 @@ class SummaryEngine {
         const poolSize = Math.min(combinedScores.length, adaptiveParagraphs + 10);
         const candidatePool = combinedScores.slice(0, poolSize);
 
+        // SOLO incluir párrafos que tengan coincidencia real con los apuntes del usuario
         let selected = candidatePool.filter(
             p => (p.noteTokenMatches >= minOverlap) || (p.userBonus >= 1.6)
         );
+        
+        // Si somos muy estrictos, relajamos un poco pero EXIGIENDO al menos 1 coincidencia
         if (selected.length < 2) {
             selected = candidatePool.filter(p => p.noteTokenMatches >= 1 || p.userBonus > 0);
         }
-        if (selected.length < 2) {
-            selected = combinedScores.slice(0, Math.min(5, combinedScores.length));
+        
+        // Si no hay ninguna coincidencia real, retornamos un mensaje en vez de rellenar con basura
+        if (selected.length === 0) {
+            return 'No se encontraron párrafos completos en el documento que coincidan directamente con tus apuntes. Asegúrate de que tus notas traten sobre los temas del PDF principal.';
         }
 
         selected = selected.slice(0, adaptiveParagraphs).sort((a, b) => a.index - b.index);
