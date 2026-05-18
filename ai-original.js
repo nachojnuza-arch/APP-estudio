@@ -2489,7 +2489,11 @@ function buildLocalSummary(filteredContext, userNotes) {
 
     if (chunks.length === 0) {
         // Si no se pudieron parsear chunks, devolver el texto crudo formateado
-        return `<div class="space-y-2">${filteredContext.split('\n').filter(l => l.trim()).map(l => `<p class="text-slate-700">${l}</p>`).join('')}</div>`;
+        return `<div class="space-y-4 pt-2">${filteredContext.split('\n').filter(l => l.trim()).map(l => {
+            const isBullet = l.trim().startsWith('🔹');
+            const style = isBullet ? "text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-100 shadow-sm" : "text-slate-700";
+            return `<p class="${style}">${l}</p>`;
+        }).join('')}</div>`;
     }
 
     // Frases conectoras variadas

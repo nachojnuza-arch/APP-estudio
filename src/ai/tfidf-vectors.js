@@ -113,8 +113,8 @@ class FastTFIDF {
                 const glossaryPatterns = /(?:ABREVIATURAS|GLOSARIO|SIGLAS|CUADRO|TABLA|REFERENCIAS|BIBLIOGRAFÍA|ÍNDICE|APÉNDICE|CONTENIDO|ÍNDICE TEMÁTICO)/i;
                 if (glossaryPatterns.test(p)) return false;
 
-                // Excluir líneas de índice típicas (ej. "Tema ...... 12")
-                const indexLines = (p.match(/\.{3,}\s*\d+/g) || []).length;
+                // Excluir líneas de índice típicas (ej. "Tema ...... 12" o "Tema ______ 12")
+                const indexLines = (p.match(/(\.{3,}|_{3,})\s*\d+/g) || []).length;
                 if (indexLines > 2) return false;
 
                 // Excluir si no tiene oraciones desarrolladas
@@ -204,6 +204,8 @@ class FastTFIDF {
             .replace(/TABLA\s*\d+.*$/gm, '')
             // Eliminar líneas que son solo números o códigos
             .replace(/^\s*\d+\s*$/gm, '')
+            // Eliminar líneas de índice con puntos o guiones bajos (ej. "Tema _____ 12")
+            .replace(/^.*?(?:\.{3,}|_{3,})\s*\d+.*$/gm, '')
             // Eliminar un solo salto de línea (unir líneas dentro del mismo párrafo), preservando los dobles
             .replace(/([^\n])\n([^\n])/g, '$1 $2')
             // Eliminar múltiples espacios

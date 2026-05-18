@@ -110,7 +110,7 @@ class SummaryEngine {
     buildCleanSummary(items) {
         if (!items || items.length === 0) return '';
         const sorted = [...items].sort((a, b) => a.index - b.index);
-        return sorted.map(s => s.text.trim()).join('\n\n').trim();
+        return sorted.map(s => `🔹 ${s.text.trim()}`).join('\n\n').trim();
     }
     
 }
