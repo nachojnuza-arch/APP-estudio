@@ -1,0 +1,183 @@
+// 3. FUNCIONES DE DATOS Y SINCRONIZACIÓN
+// ==========================================
+const LS_WORKSPACE_KEY = 'studio_data_v2';
+const LS_WORKSPACE_IDB_FLAG = 'studio_data_v2_idb';
+let _workspaceQuotaToastShown = false;
+
+function getSubjectNotesKey(subId) {
+    return 'sub_' + subId;
+}
+
+function getSubjectNotesHtml(subId) {
+    return appData.notes[getSubjectNotesKey(subId)] || '';
+}
+
+/** Une apuntes viejos (por archivo / gen_) en una sola hoja por materia. */
+function migrateNotesToPerSubject() {
+    if (!appData.notes) appData.notes = {};
+    appData.subjects.forEach(sub => {
+        const key = getSubjectNotesKey(sub.id);
+        if (appData.notes[key]) return;
+
+        let merged = '';
+        const genKey = 'gen_' + sub.id;
+        if (appData.notes[genKey]) merged = appData.notes[genKey];
+
+        sub.files.forEach(f => {
+            const part = appData.notes[f.id];
+            if (!part) return;
+            if (merged && merged.trim()) {
+                merged += '<hr><p><br></p>' + part;
+            } else {
+                merged = part;
+            }
+            delete appData.notes[f.id];
+        });
+
+        if (merged) appData.notes[key] = merged;
+        delete appData.notes[genKey];
+    });
+}
+
+function applyParsedAppData(parsed) {
+    appData = parsed;
+    if (!appData.subjects) appData.subjects = [];
+    appData.subjects.forEach(sub => {
+        if (!sub.files) sub.files = [];
+    });
+    if (!appData.notes) appData.notes = {};
+    migrateNotesToPerSubject();
+}
+
+async function loadData() {
+    if (localStorage.getItem(LS_WORKSPACE_IDB_FLAG) === '1') {
+        const raw = await idb.getWorkspace();
+        if (raw) {
+            try {
+                applyParsedAppData(JSON.parse(raw));
+                return;
+            } catch (e) {
+                console.warn('Workspace en IndexedDB corrupto o ilegible', e);
+            }
+        }
+    }
+
+    const saved = localStorage.getItem(LS_WORKSPACE_KEY);
+    if (saved) {
+        try {
+            applyParsedAppData(JSON.parse(saved));
+            idb.putWorkspace(saved).catch(() => {});
+            return;
+        } catch (e) {
+            console.warn('studio_data_v2 en localStorage ilegible', e);
+        }
+    }
+
+    const idbRaw = await idb.getWorkspace();
+    if (idbRaw) {
+        try {
+            applyParsedAppData(JSON.parse(idbRaw));
+            try {
+                localStorage.setItem(LS_WORKSPACE_IDB_FLAG, '1');
+            } catch (e) { /* ignore */ }
+            return;
+        } catch (e) {
+            console.warn('Fallback IndexedDB falló', e);
+        }
+    }
+
+    appData = { subjects: [], notes: {} };
+    await saveData(false);
+}
+
+async function flushDriveSync() {
+    if (!window.GoogleDriveSync || !window.GoogleDriveSync.isLoggedIn || !window.GoogleDriveSync.folderId) {
+        return;
+    }
+    clearTimeout(driveSyncTimer);
+    const saveStatus = document.getElementById('save-status');
+    if (saveStatus) saveStatus.innerHTML = '<i class="fas fa-sync fa-spin text-blue-500"></i> Sincronizando...';
+    try {
+        await window.GoogleDriveSync.syncAppDataToDrive(appData);
+        if (saveStatus) {
+            saveStatus.innerHTML = '<i class="fas fa-cloud-check text-emerald-500"></i> Drive';
+            setTimeout(() => { saveStatus.innerHTML = '<i class="fas fa-check text-green-500"></i> Guardado'; }, 2000);
+        }
+    } catch (err) {
+        console.error('flushDriveSync', err);
+    }
+}
+
+async function saveData(syncToDrive = true, options = {}) {
+    const { forceDrive = false } = options;
+    const serialized = JSON.stringify(appData);
+    try {
+        await idb.putWorkspace(serialized);
+    } catch (e) {
+        console.error('No se pudo guardar el workspace en IndexedDB', e);
+        if (typeof showToast === 'function') {
+            showToast('No se pudo guardar: falló IndexedDB. Revisá espacio en disco del navegador.', 'error');
+        }
+        return;
+    }
+
+    try {
+        localStorage.setItem(LS_WORKSPACE_KEY, serialized);
+        try {
+            localStorage.removeItem(LS_WORKSPACE_IDB_FLAG);
+        } catch (e) { /* ignore */ }
+    } catch (e) {
+        const quota = e && (e.name === 'QuotaExceededError' || e.code === 22);
+        if (quota) {
+            try {
+                localStorage.removeItem(LS_WORKSPACE_KEY);
+                localStorage.setItem(LS_WORKSPACE_IDB_FLAG, '1');
+            } catch (e2) { /* ignore */ }
+            if (!_workspaceQuotaToastShown && typeof showToast === 'function') {
+                _workspaceQuotaToastShown = true;
+                showToast('Memoria del navegador llena (~5 MB): tus datos siguen guardados en almacenamiento extendido y en Drive si está conectado.', 'info');
+            }
+        } else {
+            console.error('localStorage:', e);
+        }
+    }
+
+    if (syncToDrive && window.GoogleDriveSync && window.GoogleDriveSync.isLoggedIn) {
+        if (forceDrive) {
+            await flushDriveSync();
+        } else {
+            const saveStatus = document.getElementById('save-status');
+            if (saveStatus) saveStatus.innerHTML = '<i class="fas fa-sync fa-spin text-blue-500"></i> Sincronizando...';
+
+            clearTimeout(driveSyncTimer);
+            driveSyncTimer = setTimeout(() => {
+                window.GoogleDriveSync.syncAppDataToDrive(appData).then(() => {
+                    if (saveStatus) {
+                        saveStatus.innerHTML = '<i class="fas fa-cloud-check text-emerald-500"></i> Drive';
+                        setTimeout(() => { saveStatus.innerHTML = '<i class="fas fa-check text-green-500"></i> Guardado'; }, 2000);
+                    }
+                });
+            }, 3000);
+        }
+    }
+}
+
+/** Una hoja de apuntes por materia (clave sub_ID). forceDrive: subida inmediata a Drive. */
+async function saveCurrentNotes(forceDrive = false) {
+    const editor = document.getElementById('notes-editor');
+    if (!currentState.currentSubject || !editor) return;
+    appData.notes[getSubjectNotesKey(currentState.currentSubject)] = editor.innerHTML;
+    try {
+        await saveData(true, { forceDrive });
+    } catch (err) {
+        console.error('saveData', err);
+    }
+}
+
+function execCmd(command) {
+    document.execCommand(command, false, null);
+    const editor = document.getElementById('notes-editor');
+    if (editor) editor.focus();
+}
+
+// ==========================================

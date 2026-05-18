@@ -386,10 +386,36 @@
     </div>
 
     <!-- SCRIPTS MODULARES -->
-    <script src="app.js"></script>
-    <script src="ai-original.js"></script>
-    <script src="local-summary.js"></script> 
+    <!-- CORE: Estado y Datos -->
+    <script src="src/core/state.js"></script>
+    <script src="src/core/db.js"></script>
+    <script src="src/core/data.js"></script>
+
+    <!-- INTERFAZ: Utilidades y Renderizado -->
+    <script src="src/ui/utils.js"></script>
+    <script src="src/ui/render.js"></script>
+    <script src="src/ui/ai-sources.js"></script>
+    <script src="src/ui/export.js"></script>
+
+    <!-- FUNCIONES ESPECIALES -->
+    <script src="src/features/pdf-viewer.js"></script>
+    <script src="src/features/screenshot.js"></script>
+    
+    <!-- Sincronización con Google Drive -->
     <script src="google-drive-sync.js"></script>
+
+    <!-- IA: Motor Local (local-summary.js modularizado) -->
+    <script src="src/ai/config-dict.js"></script>
+    <script src="src/ai/utils-translate.js"></script>
+    <script src="src/ai/tfidf-vectors.js"></script>
+    <script src="src/ai/summary-engine.js"></script>
+    <script src="src/ai/local-init.js"></script>
+
+    <!-- IA: Motor Principal (Original) -->
+    <script src="ai-original.js"></script>
+
+    <!-- INICIALIZACIÓN -->
+    <script src="src/main.js"></script>
 
     <!-- OVERRIDES ESTÉTICOS PARA INTEGRAR TU CÓDIGO CON LA NUEVA UI -->
     <script>
