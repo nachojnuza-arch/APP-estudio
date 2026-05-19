@@ -1049,26 +1049,34 @@ function esIndice(texto) {
     return ratio > 0.4;
 }
 
-// 🆕 FUNCIÓN PRINCIPAL: Extraer texto limpio de PDF (salta índices, extrae contenido real)
-async function extractTextFromBlob(blob) {
+// 🆕 FUNCIÓN PRINCIPAL: Extraer texto limpio de PDF con Búsqueda de Dos Etapas (RAG)
+async function extractTextFromBlob(blob, userNotes = '') {
     return new Promise(async (resolve) => {
         try {
             const arrayBuffer = await blob.arrayBuffer();
             const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
             const doc = await loadingTask.promise;
 
-            let rawText = '';
-            let pagesToExtract = Math.min(15, doc.numPages);
-            let foundRealContent = false;
+            let allPages = [];
             let skippedPages = 0;
 
-            // 🆕 Extraer más páginas para encontrar contenido real (hasta 25 páginas)
-            const maxPagesToScan = Math.min(25, doc.numPages);
+            // Preparar palabras clave de los apuntes para puntuar páginas enteras (Stage 1)
+            let fuzzyKeywords = [];
+            if (userNotes && window.LocalSummary && window.LocalSummary.engine) {
+                const keywords = window.LocalSummary.engine.extractKeywordsFromNotes(userNotes);
+                fuzzyKeywords = keywords.map(k => {
+                    const isBigram = k.includes(' ');
+                    return {
+                        stem: isBigram ? k.toLowerCase() : (k.length >= 6 ? k.substring(0, 5).toLowerCase() : k.toLowerCase()),
+                        weight: isBigram ? 10.0 : (k.length >= 7 ? 4.0 : 1.0)
+                    };
+                });
+            }
 
-            for (let i = 1; i <= maxPagesToScan; i++) {
-                // Si ya encontramos contenido real y extractamos suficientes páginas, parar
-                if (foundRealContent && i > pagesToExtract) break;
+            const totalPagesToScan = doc.numPages;
+            console.log(`Buscador RAG Fase 1: Escaneando ${totalPagesToScan} páginas buscando contexto relevante...`);
 
+            for (let i = 1; i <= totalPagesToScan; i++) {
                 const page = await doc.getPage(i);
                 const textContent = await page.getTextContent();
 
@@ -1078,17 +1086,14 @@ async function extractTextFromBlob(blob) {
                     .map(item => ({
                         text: item.str.trim(),
                         y: Math.round(item.transform[5]),
-                        x: Math.round(item.transform[4]),
-                        width: Math.round(item.width || 0),
-                        height: Math.round(item.height || 0)
+                        x: Math.round(item.transform[4])
                     }));
 
                 if (items.length === 0) continue;
 
-                // Ordenar por Y descendente (arriba a abajo) y luego por X
+                // Ordenar por Y descendente y X
                 items.sort((a, b) => b.y - a.y || a.x - b.x);
 
-                // Agrupar por línea (misma Y ± 3px)
                 const lineas = [];
                 let lineaActual = [items[0]];
                 let currentY = items[0].y;
@@ -1104,7 +1109,6 @@ async function extractTextFromBlob(blob) {
                         lineaActual.push(item);
                     }
                 }
-                // Última línea
                 if (lineaActual.length > 0) {
                     lineaActual.sort((a, b) => a.x - b.x);
                     lineas.push(lineaActual.map(it => it.text).join(' '));
@@ -1112,29 +1116,59 @@ async function extractTextFromBlob(blob) {
 
                 const pageText = lineas.join('\n');
 
-                // 🆕 Detectar si esta página es un índice
-                if (!foundRealContent && esIndice(pageText)) {
+                if (esIndice(pageText)) {
                     skippedPages++;
-                    console.log(`  ⏭ Página ${i}: ÍNDICE detectado, saltando (${skippedPages} páginas saltadas)`);
                     continue;
                 }
 
-                // Si llegamos aquí, es contenido real
-                foundRealContent = true;
-                rawText += pageText + '\n\n';
-
-                if (skippedPages > 0) {
-                    console.log(`  ✅ Página ${i}: Contenido real encontrado (después de saltar ${skippedPages} páginas de índice)`);
+                // Calcular score rápido de la página si hay apuntes
+                let pageScore = 0;
+                if (fuzzyKeywords.length > 0) {
+                    const lowerPage = pageText.toLowerCase();
+                    for (const kw of fuzzyKeywords) {
+                        // Buscar cuantas veces aparece la palabra clave en toda la página
+                        let matchIndex = lowerPage.indexOf(kw.stem);
+                        let count = 0;
+                        while (matchIndex !== -1) {
+                            count++;
+                            matchIndex = lowerPage.indexOf(kw.stem, matchIndex + 1);
+                        }
+                        pageScore += count * kw.weight;
+                    }
                 }
+
+                allPages.push({ number: i, text: pageText, score: pageScore });
             }
 
             if (skippedPages > 0) {
-                console.log(`  📊 Total: ${skippedPages} páginas de índice saltadas, ${rawText.length} caracteres de contenido extraídos`);
+                console.log(`  📊 Fase 1 Completada: ${skippedPages} páginas de índice saltadas.`);
             }
+
+            // Seleccionar las mejores 15 páginas
+            let pagesToKeep = 15;
+            let selectedPages = [];
+
+            if (fuzzyKeywords.length > 0 && allPages.some(p => p.score > 0)) {
+                // Ordenar de mayor a menor score
+                allPages.sort((a, b) => b.score - a.score);
+                selectedPages = allPages.slice(0, pagesToKeep);
+                // Imprimir las mejores páginas encontradas
+                const topStr = selectedPages.slice(0, 5).map(p => `pág ${p.number} (sc:${p.score})`).join(', ');
+                console.log(`  🔍 Top páginas más relevantes: ${topStr}`);
+                
+                // Volver a ordenarlas cronológicamente para mantener el contexto
+                selectedPages.sort((a, b) => a.number - b.number);
+            } else {
+                // Si no hay apuntes o no hubo matches, tomar las primeras 15 hojas
+                console.log(`  ℹ️ No se detectaron suficientes coincidencias en Fase 1, usando las primeras ${pagesToKeep} páginas.`);
+                selectedPages = allPages.slice(0, pagesToKeep);
+            }
+
+            const rawText = selectedPages.map(p => p.text).join('\n\n');
 
             // Limpiar texto con la nueva función
             const cleanText = limpiarTextoPDF(rawText);
-            console.log(`  ✅ Texto final: ${cleanText.length} caracteres, ${cleanText.split('\n\n').length} párrafos`);
+            console.log(`  ✅ Texto final enviado a Fase 2: ${cleanText.length} caracteres, ${cleanText.split('\n\n').length} párrafos`);
             resolve(cleanText);
         } catch (e) {
             console.warn('Error extrayendo texto de PDF:', e);
@@ -2124,7 +2158,7 @@ async function generarResumenDirecto() {
                     
                     if (!blob) continue;
 
-                    const text = await extractTextFromBlob(blob);
+                    const text = await extractTextFromBlob(blob, userNotes);
                     if (text) {
                         combinedText += text + '\n\n';
                     }
