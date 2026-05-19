@@ -662,87 +662,6 @@ function esLineaUtil(linea) {
     return true;
 }
 
-// 🆕 FUNCIÓN: Unir líneas cortadas y limpiar texto completo
-function limpiarYUnirTexto(textoCompleto) {
-    if (!textoCompleto) return '';
-
-    // 1. Dividir en líneas
-    let lineas = textoCompleto.split(/\n+/);
-
-    // 2. Filtrar líneas basura
-    lineas = lineas.filter(esLineaUtil);
-
-    // 3. Unir líneas cortadas
-    // Si una línea termina sin punto y la siguiente empieza en minúscula → unir
-    let lineasUnidas = [];
-    let lineaActual = '';
-
-    for (let i = 0; i < lineas.length; i++) {
-        const linea = lineas[i].trim();
-        if (!linea) continue;
-
-        if (lineaActual === '') {
-            lineaActual = linea;
-        } else {
-            const terminaSinPunto = !/[.!?…]\s*$/.test(lineaActual);
-            const empiezaMinuscula = /^[a-záéíóúñü]/.test(linea);
-
-            if (terminaSinPunto && empiezaMinuscula) {
-                // Unir con espacio
-                lineaActual += ' ' + linea;
-            } else {
-                // Guardar línea actual y empezar nueva
-                if (lineaActual.length > 20) {
-                    lineasUnidas.push(lineaActual);
-                }
-                lineaActual = linea;
-            }
-        }
-    }
-
-    // Última línea
-    if (lineaActual && lineaActual.length > 20) {
-        lineasUnidas.push(lineaActual);
-    }
-
-    // 4. Normalizar espacios múltiples
-    lineasUnidas = lineasUnidas.map(l => l.replace(/\s{2,}/g, ' ').trim());
-
-    // 5. Filtrar líneas que aún son basura después de unión
-    lineasUnidas = lineasUnidas.filter(l => l.length > 30);
-
-    // 6. Unir en párrafos (separar por doble salto conceptual)
-    let parrafos = [];
-    let parrafoActual = '';
-
-    for (const linea of lineasUnidas) {
-        // Detectar si es inicio de nuevo párrafo:
-        // - Termina en punto
-        // - Siguiente línea empieza con mayúscula
-        // - O la línea actual parece título (muy corta, todo mayúsculas)
-        const esNuevoParrafo = /[.!?]\s*$/.test(linea) && 
-                               parrafoActual.length > 50;
-
-        if (esNuevoParrafo) {
-            parrafos.push(parrafoActual.trim());
-            parrafoActual = linea;
-        } else {
-            parrafoActual += (parrafoActual ? ' ' : '') + linea;
-        }
-    }
-
-    // Último párrafo
-    if (parrafoActual.trim()) {
-        parrafos.push(parrafoActual.trim());
-    }
-
-    // Filtrar párrafos muy cortos o sin sentido
-    parrafos = parrafos.filter(p => p.length > 40 && !/^[A-ZÁÉÍÓÚÑ\s]{10,60}$/.test(p));
-
-    return parrafos.join('\n\n');
-}
-
-// 🆕 EXTRAER PÁGINAS COMPLETAS ordenadas por relevancia (máximo 4)
 // Estrategia simple y confiable: comparar notas vs cada página del PDF
 async function extraerPaginasRelevantes(userNotes, maxPaginas = 4) {
     if (!userNotes || userNotes.trim().length < 10) return null;
@@ -892,134 +811,6 @@ async function extraerPaginasRelevantes(userNotes, maxPaginas = 4) {
     };
 }
 
-// 🆕 FUNCIÓN: Limpiar texto extraído de PDFs (eliminar basura de ClinicalKey/Elsevier)
-function limpiarTextoPDF(texto) {
-    if (!texto || texto.length < 50) return '';
-
-    // 1. Dividir en líneas
-    let lineas = texto.split(/\n+/);
-
-    // 2. Eliminar líneas basura
-    const lineasLimpias = lineas.filter(linea => {
-        const l = linea.trim();
-        if (l.length < 2) return false;
-
-        // Patrones de basura (eliminar si coinciden)
-        const patronesBasura = [
-            /descargado\s*para/i,
-            /clinicalkey/i,
-            /elsevier/i,
-            /copyright\s*©/i,
-            /todos\s*los\s*derechos\s*reservados/i,
-            /soymedicina\.com/i,
-            /©\s*\d{4}/i,
-            /https?:\/\//i,
-            /fotocopiar\s*sin\s*autorización/i,
-            /para\s*uso\s*personal\s*exclusivamente/i,
-            /no\s*se\s*permiten\s*otros\s*usos/i,
-            /rights\s*reserved/i,
-            /shlomo\s*melmed/i,
-            /richard\s*j\.\s*auchus/i,
-            /allison\s*b\.\s*goldfine/i,
-            /ronald\s*j\.\s*koenig/i,
-            /clifford\s*j\.\s*rosen/i,
-            /p\.\s*reed\s*larsen/i,
-            /kenneth\s*s\.\s*polonsky/i,
-            /henry\s*m\.\s*kronenberg/i
-        ];
-
-        for (const patron of patronesBasura) {
-            if (patron.test(l)) return false;
-        }
-
-        // Solo números (páginas sueltas)
-        if (/^\d{1,4}$/.test(l)) return false;
-
-        // Listas de índices: "Tema, 10 Otro tema, 4 Tema más, 22"
-        if (/, \d+/.test(l) && l.split(/, \d+/).length >= 3) return false;
-
-        // Líneas que empiezan con "•" y son cortas (<40 chars)
-        if (l.startsWith('•') && l.length < 40) return false;
-
-        // Líneas que son SOLO mayúsculas y largas (>30 chars) - títulos de sección
-        if (/^[A-ZÁÉÍÓÚÑ\s]{30,}$/.test(l)) return false;
-
-        // Líneas que son solo guiones o caracteres especiales
-        if (/^[-–—\s*]{3,}$/.test(l)) return false;
-
-        return true;
-    });
-
-    // 3. Unir líneas cortadas
-    let lineasUnidas = [];
-    let lineaActual = '';
-
-    for (let i = 0; i < lineasLimpias.length; i++) {
-        const linea = lineasLimpias[i].trim();
-        if (!linea) continue;
-
-        if (lineaActual === '') {
-            lineaActual = linea;
-        } else {
-            const terminaSinPunto = !/[.!?…]\s*$/.test(lineaActual);
-            const empiezaMinuscula = /^[a-záéíóúñü]/.test(linea);
-
-            if (terminaSinPunto && empiezaMinuscula) {
-                // Unir con espacio (línea cortada en el PDF)
-                lineaActual += ' ' + linea;
-            } else {
-                // Guardar línea actual y empezar nueva
-                if (lineaActual.length > 10) {
-                    lineasUnidas.push(lineaActual);
-                }
-                lineaActual = linea;
-            }
-        }
-    }
-
-    // Última línea
-    if (lineaActual && lineaActual.length > 10) {
-        lineasUnidas.push(lineaActual);
-    }
-
-    // 4. Normalizar espacios múltiples
-    lineasUnidas = lineasUnidas.map(l => l.replace(/\s{2,}/g, ' ').trim());
-
-    // 5. Filtrar líneas que aún son muy cortas después de unión
-    lineasUnidas = lineasUnidas.filter(l => l.length > 20);
-
-    // 6. Unir en párrafos (doble salto de línea)
-    let parrafos = [];
-    let parrafoActual = '';
-
-    for (const linea of lineasUnidas) {
-        // Detectar si es inicio de nuevo párrafo
-        const terminaEnPunto = /[.!?]\s*$/.test(linea);
-        const esParrafoNuevo = terminaEnPunto && parrafoActual.length > 50;
-
-        if (esParrafoNuevo) {
-            parrafos.push(parrafoActual.trim());
-            parrafoActual = linea;
-        } else {
-            parrafoActual += (parrafoActual ? ' ' : '') + linea;
-        }
-    }
-
-    // Último párrafo
-    if (parrafoActual.trim()) {
-        parrafos.push(parrafoActual.trim());
-    }
-
-    // Filtrar párrafos muy cortos o que parecen títulos
-    parrafos = parrafos.filter(p => {
-        if (p.length < 30) return false;
-        if (/^[A-ZÁÉÍÓÚÑ\s]{10,60}$/.test(p)) return false;  // Solo mayúsculas
-        return true;
-    });
-
-    // Devolver con doble salto entre párrafos
-    return parrafos.join('\n\n');
-}
 
 // 🆕 FUNCIÓN: Detectar si un bloque de texto es un índice/tabla de contenido
 function esIndice(texto) {
@@ -1173,9 +964,9 @@ async function extractTextFromBlob(blob, userNotes = '') {
 
             const rawText = selectedPages.map(p => p.text).join('\n\n');
 
-            // Limpiar texto con la nueva función
-            const cleanText = limpiarTextoPDF(rawText);
-            console.log(`  ✅ Texto final enviado a Fase 2: ${cleanText.length} caracteres, ${cleanText.split('\n\n').length} párrafos`);
+            // Evitar limpiar aquí porque destruye la estructura, lo limpiamos en LocalSummary (Fase 2)
+            const cleanText = rawText;
+            console.log(`  ✅ Texto final enviado a Fase 2: ${cleanText.length} caracteres`);
             resolve(cleanText);
         } catch (e) {
             console.warn('Error extrayendo texto de PDF:', e);

@@ -20,7 +20,7 @@ class SummaryEngine {
             return 'No se encontró texto suficiente en el PDF para armar un resumen.';
         }
 
-        const adaptiveParagraphs = Math.max(2, Math.min(12, 1 + Math.floor(notesLength / 420)));
+        const adaptiveParagraphs = Math.max(5, Math.min(20, 4 + Math.floor(notesLength / 150)));
 
         const userKeywords = this.extractKeywordsFromNotes(translatedNotes);
 
