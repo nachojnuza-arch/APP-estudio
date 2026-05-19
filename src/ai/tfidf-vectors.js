@@ -91,12 +91,12 @@ class FastTFIDF {
     }
     
     splitSentences(text) {
-        // ✅ DIVIDIR POR ORACIONES (separados por puntuación o saltos de línea grandes)
-        const sentences = text.split(/[.!?]+|\n\s*\n/);
+        // ✅ DIVIDIR POR ORACIONES conservando la puntuación (usamos match)
+        const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
 
         return sentences
-            .map(p => p.trim())
-            .filter(p => p.length > 40 && p.length < 3000); // Oraciones válidas
+            .map(p => p.replace(/\s+/g, ' ').trim())
+            .filter(p => p.length > 30 && p.length < 3000); // Oraciones válidas
     }
 
     /**
@@ -107,11 +107,18 @@ class FastTFIDF {
         const normalized = text.replace(/\s+/g, ' ').trim();
         let blocks = text.split(/\n\s*\n+/).map(p => p.replace(/\s+/g, ' ').trim())
             .filter(p => {
-                if (p.length < 150 || p.length > 14000) return false;
+                if (p.length < 60 || p.length > 20000) return false;
                 
                 // Excluir glosarios, índices, tablas de contenido, bibliografía, dedicatorias
                 const glossaryPatterns = /(?:ABREVIATURAS|GLOSARIO|SIGLAS|CUADRO|TABLA|REFERENCIAS|BIBLIOGRAFÍA|ÍNDICE|APÉNDICE|CONTENIDO|ÍNDICE TEMÁTICO|DEDICATORIA|AGRADECIMIENTO)/i;
                 if (glossaryPatterns.test(p)) return false;
+
+                // 🆕 NUEVO: Excluir párrafos que parecen captions de figuras/tablas enteras
+                if (/^(?:Fig\.|Figura|Tabla|Cuadro|Gráfico)\s*\d+[\.\-:]/i.test(p)) return false;
+
+                // 🆕 NUEVO: Excluir tablas rotas o llenas de números y códigos (ej. "3.5  12.1  A+  5")
+                const numbersMatch = p.match(/\d+/g);
+                if (numbersMatch && numbersMatch.length > 10 && p.length < 300) return false;
 
                 // Excluir referencias bibliográficas sueltas
                 if (p.includes('doi: 10.') || /(?:et al\.,?\s*\d{4}|Curr Opin|J Microbiol)/i.test(p)) return false;
@@ -132,16 +139,14 @@ class FastTFIDF {
             });
             
         if (blocks.length < 3) {
+            // Fallback si no hay suficientes saltos de párrafo claros
             const sentences = this.splitSentences(text);
             blocks = [];
-            const step = 5;
+            const step = 4;
             for (let i = 0; i < sentences.length; i += step) {
                 const chunk = sentences.slice(i, i + step).join(' ');
-                if (chunk.length >= 150) {
-                    const sentenceCount = (chunk.match(/[.!?]+/g) || []).length;
-                    if (sentenceCount >= 2 && !(chunk.match(/\.{3,}\s*\d+/g) || []).length) {
-                        blocks.push(chunk);
-                    }
+                if (chunk.length >= 80) {
+                    blocks.push(chunk);
                 }
             }
         }
@@ -210,19 +215,22 @@ class FastTFIDF {
             .replace(/(\w+)-\s*\n\s*(\w+)/g, '$1$2')
             // Eliminar números de página (ej: "350 CAPÍTULO 11")
             .replace(/^\d+\s+(CAPÍTULO|FIGURA|TABLA)\s*\d*/gm, '')
-            // Eliminar referencias a figuras y tablas
+            // Eliminar referencias a figuras y tablas intralínea
             .replace(/FIGURA\s*\d+[-\d]*.*$/gm, '')
             .replace(/TABLA\s*\d+.*$/gm, '')
-            // Eliminar líneas que son solo números o códigos
-            .replace(/^\s*\d+\s*$/gm, '')
+            // 🆕 NUEVO: Filtros agresivos para captions y pies de página
+            .replace(/^(?:Fig\.|Figura|Tabla|Cuadro|Gráfico|Ilustración)\s*\d+[\.\-:].*$/gmi, '')
+            .replace(/^(?:Fuente|Source):\s*.*$/gmi, '')
+            // Eliminar líneas que son solo números o códigos con guiones
+            .replace(/^\s*[\d\.\-\*\,]+\s*$/gm, '')
             // Eliminar líneas de índice con puntos o guiones bajos (ej. "Tema _____ 12")
             .replace(/^.*?(?:\.{3,}|_{3,})\s*\d+.*$/gm, '')
             // Eliminar un solo salto de línea (unir líneas dentro del mismo párrafo), preservando los dobles
             .replace(/([^\n])\n([^\n])/g, '$1 $2')
             // Eliminar múltiples espacios (solo espacios y tabs, para preservar los saltos de línea vitales)
             .replace(/[ \t]{2,}/g, ' ')
-            // Eliminar paréntesis vacíos o con poco contenido
-            .replace(/\([^)]{0,3}\)/g, '')
+            // Eliminar paréntesis vacíos o con poco contenido (como citas rotas)
+            .replace(/\([^)]{0,4}\)/g, '')
             .trim();
         
         return cleaned;

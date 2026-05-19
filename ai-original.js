@@ -885,34 +885,64 @@ async function extractTextFromBlob(blob, userNotes = '') {
                 // Ordenar por Y descendente y X
                 items.sort((a, b) => b.y - a.y || a.x - b.x);
 
-                const lineas = [];
-                let lineaActual = [items[0]];
-                let currentY = items[0].y;
+                // Detectar si es una página de dos columnas (libros médicos)
+                const minX = Math.min(...items.map(i => i.x));
+                const maxX = Math.max(...items.map(i => i.x + (i.width || (i.text.length * 5))));
+                const midX = minX + (maxX - minX) / 2;
 
-                for (let j = 1; j < items.length; j++) {
-                    const item = items[j];
-                    const yDiff = Math.abs(item.y - currentY);
-                    if (yDiff > 4) {
-                        lineaActual.sort((a, b) => a.x - b.x);
-                        lineas.push(lineaActual.map(it => it.text).join(' '));
-                        
-                        // Si la diferencia Y es grande (salto de párrafo), insertar línea en blanco
-                        if (yDiff > 14) {
-                            lineas.push('');
-                        }
-                        
-                        lineaActual = [item];
-                        currentY = item.y;
-                    } else {
-                        lineaActual.push(item);
+                let crossMiddleCount = 0;
+                for(const item of items) {
+                    const itemWidth = item.width || (item.text.length * 5);
+                    if (item.x < midX - 20 && (item.x + itemWidth) > midX + 20) {
+                        crossMiddleCount++;
                     }
                 }
-                if (lineaActual.length > 0) {
-                    lineaActual.sort((a, b) => a.x - b.x);
-                    lineas.push(lineaActual.map(it => it.text).join(' '));
+
+                // Si más de 5 bloques cruzan el centro, o la página es muy estrecha, asumimos 1 sola columna
+                const isTwoColumns = crossMiddleCount <= 5 && (maxX - minX) >= 250;
+
+                const processColumn = (colItems) => {
+                    if (colItems.length === 0) return [];
+                    colItems.sort((a, b) => b.y - a.y || a.x - b.x);
+
+                    const lineas = [];
+                    let lineaActual = [colItems[0]];
+                    let currentY = colItems[0].y;
+
+                    for (let j = 1; j < colItems.length; j++) {
+                        const item = colItems[j];
+                        const yDiff = Math.abs(item.y - currentY);
+                        if (yDiff > 4) {
+                            lineaActual.sort((a, b) => a.x - b.x);
+                            lineas.push(lineaActual.map(it => it.text).join(' '));
+                            
+                            if (yDiff > 14) {
+                                lineas.push('');
+                            }
+                            
+                            lineaActual = [item];
+                            currentY = item.y;
+                        } else {
+                            lineaActual.push(item);
+                        }
+                    }
+                    if (lineaActual.length > 0) {
+                        lineaActual.sort((a, b) => a.x - b.x);
+                        lineas.push(lineaActual.map(it => it.text).join(' '));
+                    }
+                    return lineas;
+                };
+
+                let finalLines = [];
+                if (isTwoColumns) {
+                    const leftColumn = items.filter(item => item.x < midX);
+                    const rightColumn = items.filter(item => item.x >= midX);
+                    finalLines = [...processColumn(leftColumn), '', ...processColumn(rightColumn)];
+                } else {
+                    finalLines = processColumn(items);
                 }
 
-                const pageText = lineas.join('\n');
+                const pageText = finalLines.join('\n');
 
                 if (esIndice(pageText)) {
                     skippedPages++;
