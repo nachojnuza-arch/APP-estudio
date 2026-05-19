@@ -165,10 +165,13 @@ class FastTFIDF {
 
             for (const token in tf) {
                 if (userTokens.has(token)) {
-                    score += tf[token] * (idf[token] || 1) * 4;
+                    // Usar logaritmo para la frecuencia y sumar 1 asegura que la mera presencia de la palabra sume mucho, 
+                    // sin importar cuán largo sea el párrafo.
+                    const tokenScore = (1 + Math.log(tokens.length * tf[token] + 1)) * (idf[token] || 1);
+                    score += tokenScore * 5;
                     matchCount++;
                 } else {
-                    score += tf[token] * (idf[token] || 1) * 0.14;
+                    score += tf[token] * (idf[token] || 1) * 0.1;
                 }
             }
 
@@ -176,14 +179,15 @@ class FastTFIDF {
                 if (userTokens.has(term)) {
                     for (const syn of synonyms) {
                         if (tokens.includes(syn)) {
-                            score += 2.5;
+                            score += 3;
                             matchCount++;
                         }
                     }
                 }
             }
 
-            score /= Math.sqrt(tokens.length + 2);
+            // Penalización por longitud MUY suave, solo para evitar que un capítulo entero gane siempre
+            score /= Math.log(tokens.length + 10);
 
             scores.push({
                 index: paragraphObjs[i].index,
