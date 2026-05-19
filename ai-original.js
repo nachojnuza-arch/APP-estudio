@@ -1100,9 +1100,16 @@ async function extractTextFromBlob(blob, userNotes = '') {
 
                 for (let j = 1; j < items.length; j++) {
                     const item = items[j];
-                    if (Math.abs(item.y - currentY) > 3) {
+                    const yDiff = Math.abs(item.y - currentY);
+                    if (yDiff > 4) {
                         lineaActual.sort((a, b) => a.x - b.x);
                         lineas.push(lineaActual.map(it => it.text).join(' '));
+                        
+                        // Si la diferencia Y es grande (salto de párrafo), insertar línea en blanco
+                        if (yDiff > 14) {
+                            lineas.push('');
+                        }
+                        
                         lineaActual = [item];
                         currentY = item.y;
                     } else {

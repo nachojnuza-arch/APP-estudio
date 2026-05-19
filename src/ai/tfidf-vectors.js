@@ -113,6 +113,9 @@ class FastTFIDF {
                 const glossaryPatterns = /(?:ABREVIATURAS|GLOSARIO|SIGLAS|CUADRO|TABLA|REFERENCIAS|BIBLIOGRAFÍA|ÍNDICE|APÉNDICE|CONTENIDO|ÍNDICE TEMÁTICO|DEDICATORIA|AGRADECIMIENTO)/i;
                 if (glossaryPatterns.test(p)) return false;
 
+                // Excluir referencias bibliográficas sueltas
+                if (p.includes('doi: 10.') || /(?:et al\.,?\s*\d{4}|Curr Opin|J Microbiol)/i.test(p)) return false;
+
                 // Excluir dedicatorias o textos introductorios típicos
                 const introPatterns = /(?:dedicamos a|nuestras familias|nuestros alumnos|agradecemos|este libro es producto|este libro se lo dedicamos|práctica docente)/i;
                 if (introPatterns.test(p)) return false;
