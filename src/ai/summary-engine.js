@@ -73,26 +73,41 @@ class SummaryEngine {
     combineScores(tfidfScores, vectorScores, weights, userKeywords) {
         const combined = [];
 
+        // Generar raíces (primeros 5 caracteres) para tolerancia a errores ortográficos e inflexiones
+        const fuzzyKeywords = userKeywords.map(k => {
+            const isBigram = k.includes(' ');
+            return {
+                full: k.toLowerCase(),
+                stem: isBigram ? k.toLowerCase() : (k.length >= 6 ? k.substring(0, 5).toLowerCase() : k.toLowerCase()),
+                weight: isBigram ? 25.0 : (k.length >= 7 ? 6.0 : 1.5) // Bigramas y palabras largas dominan el puntaje
+            };
+        });
+
         for (const tfidf of tfidfScores) {
             const vector = vectorScores.find(v => v.index === tfidf.index) || { score: 0 };
 
             let userMatchBonus = 0;
             const lowerSentence = tfidf.text.toLowerCase();
+            let matchedHeavyTokens = 0;
 
-            for (const keyword of userKeywords) {
-                if (lowerSentence.includes(keyword.toLowerCase())) {
-                    userMatchBonus += 1.8;
+            for (const kw of fuzzyKeywords) {
+                if (lowerSentence.includes(kw.stem)) {
+                    userMatchBonus += kw.weight;
+                    if (kw.weight >= 6.0) matchedHeavyTokens++;
                 }
             }
+
+            // Multiplicador si el párrafo coincide con las palabras clave más fuertes
+            const multiplier = matchedHeavyTokens > 0 ? (1 + (matchedHeavyTokens * 0.5)) : 1;
 
             combined.push({
                 index: tfidf.index,
                 text: tfidf.text,
-                score: (tfidf.score * weights.tfidf) + (vector.score * weights.vector) + userMatchBonus,
+                score: ((tfidf.score * weights.tfidf) + (vector.score * weights.vector) + userMatchBonus) * multiplier,
                 tfidfScore: tfidf.score,
                 vectorScore: vector.score,
                 userBonus: userMatchBonus,
-                noteTokenMatches: tfidf.matchCount || 0
+                noteTokenMatches: (tfidf.matchCount || 0) + matchedHeavyTokens
             });
         }
 
@@ -104,8 +119,15 @@ class SummaryEngine {
         const tokens = tokenize(plain);
         const stopwords = stopwordsES();
         const keywords = tokens.filter(w => !stopwords.has(w) && w.length > 3);
+        
+        // Agregar bigramas para atrapar conceptos compuestos ("giardia lamblia")
+        for (let i = 0; i < tokens.length - 1; i++) {
+            if (!stopwords.has(tokens[i]) && !stopwords.has(tokens[i+1]) && tokens[i].length > 3) {
+                keywords.push(tokens[i] + ' ' + tokens[i+1]);
+            }
+        }
 
-        return [...new Set(keywords)].slice(0, 35);
+        return [...new Set(keywords)].slice(0, 50);
     }
 
     buildCleanSummary(items) {
