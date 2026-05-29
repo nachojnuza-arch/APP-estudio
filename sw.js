@@ -1,4 +1,4 @@
-const CACHE_NAME = 'apuntes-facultad-cache-v8';
+const CACHE_NAME = 'apuntes-facultad-cache-v9';
 
 // 1. Lista actualizada con la nueva estructura de carpetas
 const FILES_TO_CACHE = [
