@@ -1,4 +1,4 @@
-const CACHE_NAME = 'apuntes-facultad-cache-v3';
+const CACHE_NAME = 'apuntes-facultad-cache-v5';
 
 // 1. Lista actualizada con la nueva estructura de carpetas
 const FILES_TO_CACHE = [
@@ -23,7 +23,11 @@ const FILES_TO_CACHE = [
   './src/ai/local-init.js',
   './src/ai/summary-engine.js',
   './src/ai/tfidf-vectors.js',
-  './src/ai/utils-translate.js'
+  './src/ai/utils-translate.js',
+  './app_logo.png',
+  './icon-96.png',
+  './icon-192.png',
+  './icon-512.png'
 ];
 
 // Instala el service worker y guarda en caché
