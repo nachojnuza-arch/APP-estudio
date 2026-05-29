@@ -97,31 +97,53 @@ async function confirmAddFile() {
     const customName = document.getElementById('file-name').value.trim();
     const sub = appData.subjects.find(s => s.id === document.getElementById('file-target-subject').value);
     
-    let fileObj = { id: 'file_' + Date.now(), name: '', type: type.includes('pdf') ? 'pdf' : 'video', url: '', isLocal: type === 'pdf_local', driveId: null };
-
     if (type === 'pdf_local') {
-        const file = document.getElementById('file-upload').files[0];
-        if (!file) return showToast('Selecciona un PDF', 'error');
+        const files = document.getElementById('file-upload').files;
+        if (!files || files.length === 0) return showToast('Selecciona al menos un PDF', 'error');
         
-        // Si no se puso nombre, toma el original y le quita la extensión
-        fileObj.name = customName || file.name.replace(/\.[^/.]+$/, "");
+        showToast(`Procesando ${files.length} archivo(s)...`, 'info');
         
-        await idb.save(fileObj.id, file); 
-        
-        if (window.GoogleDriveSync && window.GoogleDriveSync.isLoggedIn) {
-            showToast('Subiendo respaldo a Drive...', 'info');
-            window.GoogleDriveSync.uploadPdfToDrive(file, fileObj.name, sub).then(dId => {
-                if (dId) { fileObj.driveId = dId; saveData(); renderSubjects(); }
-            });
+        let lastFileId = null;
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const isSingle = files.length === 1;
+            
+            // Si es múltiple ignoramos el nombre custom para no repetir
+            const finalName = (isSingle && customName) ? customName : file.name.replace(/\.[^/.]+$/, "");
+            
+            let fileObj = { id: 'file_' + Date.now() + '_' + i, name: finalName, type: 'pdf', url: '', isLocal: true, driveId: null };
+            lastFileId = fileObj.id;
+            
+            await idb.save(fileObj.id, file); 
+            
+            if (window.GoogleDriveSync && window.GoogleDriveSync.isLoggedIn) {
+                // Para no bloquear la UI subimos en background
+                window.GoogleDriveSync.uploadPdfToDrive(file, fileObj.name, sub).then(dId => {
+                    if (dId) { fileObj.driveId = dId; saveData(); renderSubjects(); }
+                });
+            }
+            
+            sub.files.push(fileObj);
         }
+        
+        await saveData();
+        currentState.expandedSubjects[sub.id] = true;
+        closeModal('add-file-modal'); 
+        renderSubjects(); 
+        if (lastFileId) openFile(sub.id, lastFileId);
+        
     } else {
+        let fileObj = { id: 'file_' + Date.now(), name: '', type: 'video', url: '', isLocal: false, driveId: null };
         fileObj.name = customName || 'Documento o Video Web';
         fileObj.url = document.getElementById('file-url').value;
+        sub.files.push(fileObj); 
+        await saveData();
+        currentState.expandedSubjects[sub.id] = true;
+        closeModal('add-file-modal'); 
+        renderSubjects(); 
+        openFile(sub.id, fileObj.id);
     }
     
-    sub.files.push(fileObj); saveData();
-    currentState.expandedSubjects[sub.id] = true;
-    closeModal('add-file-modal'); renderSubjects(); openFile(sub.id, fileObj.id);
     document.getElementById('file-name').value = '';
     document.getElementById('file-upload').value = '';
 }

@@ -1,15 +1,29 @@
-const CACHE_NAME = 'apuntes-facultad-cache-v2';
+const CACHE_NAME = 'apuntes-facultad-cache-v3';
 
-// 1. Lista corregida: usamos los nombres reales de tus archivos
+// 1. Lista actualizada con la nueva estructura de carpetas
 const FILES_TO_CACHE = [
   './',
   './index.html',
   './app.css',
-  './app.js',
-  './local-summary.js',
+  './styles.css',
   './google-drive-sync.js',
   './ai-original.js',
-  './manifest.json'
+  './manifest.json',
+  './src/main.js',
+  './src/core/data.js',
+  './src/core/db.js',
+  './src/core/state.js',
+  './src/features/pdf-viewer.js',
+  './src/features/screenshot.js',
+  './src/ui/ai-sources.js',
+  './src/ui/export.js',
+  './src/ui/render.js',
+  './src/ui/utils.js',
+  './src/ai/config-dict.js',
+  './src/ai/local-init.js',
+  './src/ai/summary-engine.js',
+  './src/ai/tfidf-vectors.js',
+  './src/ai/utils-translate.js'
 ];
 
 // Instala el service worker y guarda en caché

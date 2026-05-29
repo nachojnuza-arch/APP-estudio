@@ -177,10 +177,50 @@ async function saveCurrentNotes(forceDrive = false) {
     const editor = document.getElementById('notes-editor');
     if (!currentState.currentSubject || !currentState.currentSheetId || !editor) return;
     appData.notes[getSubjectNotesKey(currentState.currentSubject, currentState.currentSheetId)] = editor.innerHTML;
+    currentState.isDirty = false;
+    updateSaveStatus('Guardado localmente', 'emerald');
     try {
         await saveData(true, { forceDrive });
     } catch (err) {
         console.error('saveData', err);
+    }
+}
+
+/** Guardado incondicional manual, sube a Drive saltando validaciones previas */
+async function forceManualSave() {
+    const editor = document.getElementById('notes-editor');
+    if (!currentState.currentSubject || !currentState.currentSheetId || !editor) return;
+    
+    updateSaveStatus('<i class="fas fa-spinner fa-spin"></i> Guardando en la nube...', 'blue');
+    
+    appData.notes[getSubjectNotesKey(currentState.currentSubject, currentState.currentSheetId)] = editor.innerHTML;
+    currentState.isDirty = false;
+    
+    try {
+        await saveData(true, { forceDrive: false }); // Guarda en IndexedDB/LocalStorage primero
+        
+        if (window.GoogleDriveSync && window.GoogleDriveSync.isLoggedIn) {
+            // Fuerzo subida directa sin leer la nube para no perder lo que tengo
+            await window.GoogleDriveSync.syncAppDataToDrive(appData);
+            updateSaveStatus('<i class="fas fa-cloud-check text-emerald-500"></i> Guardado en la nube', 'emerald');
+            setTimeout(() => { updateSaveStatus('<i class="fas fa-check text-emerald-500"></i> Guardado', 'slate'); }, 3000);
+            if(typeof showToast === 'function') showToast('Progreso guardado a salvo en la nube', 'success');
+        } else {
+            updateSaveStatus('<i class="fas fa-check text-emerald-500"></i> Guardado local', 'slate');
+            if(typeof showToast === 'function') showToast('Progreso guardado localmente (sin conexión a Drive)', 'info');
+        }
+    } catch (err) {
+        console.error('forceManualSave', err);
+        updateSaveStatus('<i class="fas fa-times text-red-500"></i> Error', 'red');
+        if(typeof showToast === 'function') showToast('Error al guardar', 'error');
+    }
+}
+
+function updateSaveStatus(html, colorColor = 'slate') {
+    const saveStatus = document.getElementById('save-status');
+    if (saveStatus) {
+        saveStatus.innerHTML = html;
+        saveStatus.className = `text-[10px] text-${colorColor}-500 uppercase font-bold tracking-widest whitespace-nowrap`;
     }
 }
 

@@ -212,8 +212,8 @@
                         <!-- Pestañas dinámicas -->
                     </div>
                     
-                    <div class="border-b border-slate-100 px-4 py-2 flex items-center justify-between bg-white shrink-0 gap-2 flex-wrap sm:flex-nowrap">
-                        <div class="flex gap-1 shrink-0">
+                    <div class="border-b border-slate-100 px-4 py-2 flex items-center justify-between bg-white shrink-0 gap-2 flex-wrap">
+                        <div class="flex gap-1 shrink-0 flex-wrap">
                             <button type="button" title="Negrita" onclick="execCmd('bold')" class="w-8 h-8 shrink-0 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-bold"></i></button>
                             <button type="button" title="Cursiva" onclick="execCmd('italic')" class="w-8 h-8 shrink-0 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-italic"></i></button>
                             <button type="button" title="Lista" onclick="execCmd('insertUnorderedList')" class="w-8 h-8 shrink-0 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-list-ul"></i></button>
@@ -224,8 +224,11 @@
                             <button type="button" title="Achicar imagen" onclick="resizeImage(0.8)" class="w-8 h-8 shrink-0 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-search-minus"></i></button>
                             <button type="button" title="Agrandar imagen" onclick="resizeImage(1.2)" class="w-8 h-8 shrink-0 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"><i class="fas fa-search-plus"></i></button>
                         </div>
-                        <div class="flex items-center gap-3 shrink-0">
+                        <div class="flex items-center gap-2 shrink-0 flex-wrap">
                             <span id="save-status" class="text-[10px] text-slate-400 uppercase font-bold tracking-widest whitespace-nowrap"><i class="fas fa-check text-emerald-500"></i> Guardado</span>
+                            <button type="button" title="Guardar cambios" onclick="forceManualSave()" class="text-[10px] font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 px-3 py-1.5 rounded-lg uppercase tracking-wider transition-colors flex items-center gap-1.5 shrink-0">
+                                <i class="fas fa-save text-sm"></i> Guardar
+                            </button>
                             <button type="button" title="Exportar notas" onclick="exportNotesAsDocx()" class="text-[10px] font-bold text-primary-600 bg-primary-50 hover:bg-primary-100 border border-primary-100 px-3 py-1.5 rounded-lg uppercase tracking-wider transition-colors flex items-center gap-1.5 shrink-0">
                                 <i class="fas fa-download text-sm"></i> Exportar
                             </button>
@@ -351,8 +354,8 @@
                     </select>
                 </div>
                 <div id="input-local">
-                    <label for="file-upload" class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">Seleccionar Archivo</label>
-                    <input type="file" id="file-upload" title="Subir PDF" accept="application/pdf" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 cursor-pointer border border-slate-200 rounded-xl p-1.5 bg-white">
+                    <label for="file-upload" class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">Seleccionar Archivo(s)</label>
+                    <input type="file" id="file-upload" title="Subir PDF" accept="application/pdf" multiple class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 cursor-pointer border border-slate-200 rounded-xl p-1.5 bg-white">
                 </div>
                 <div id="input-url" class="hidden">
                     <label for="file-url" class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">Enlace Web</label>

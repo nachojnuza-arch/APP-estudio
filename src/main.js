@@ -32,8 +32,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
 
     document.getElementById('notes-editor').addEventListener('input', () => {
-        clearTimeout(autoSaveTimer);
-        autoSaveTimer = setTimeout(() => saveCurrentNotes(false), AUTO_SAVE_IDLE_MS);
+        currentState.isDirty = true;
+        if (typeof updateSaveStatus === 'function') {
+            updateSaveStatus('<i class="fas fa-exclamation-circle text-amber-500"></i> Sin guardar', 'amber');
+        }
         
         const editor = document.getElementById('notes-editor');
         const selection = window.getSelection();
@@ -101,11 +103,18 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
 
     document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') {
-            saveCurrentNotes(true);
-        }
+        // En móviles/pestañas ocultas, ya no auto-guardamos sin permiso, pero por si acaso podríamos forzar local.
+        // Se desactiva el auto-guardado a pedido del usuario.
     });
     window.addEventListener('pagehide', () => {
-        saveCurrentNotes(true);
+        // Se desactiva el auto-guardado a pedido del usuario.
+    });
+    
+    // Alerta al cerrar si hay cambios sin guardar
+    window.addEventListener('beforeunload', (e) => {
+        if (currentState.isDirty) {
+            e.preventDefault();
+            e.returnValue = ''; // Muestra el mensaje por defecto del navegador
+        }
     });
 });
