@@ -343,6 +343,9 @@ window.GoogleDriveSync = {
             });
 
             if (response.result.files && response.result.files.length > 0) {
+                // Guardar avance local primero
+                if (typeof saveCurrentNotes === 'function') await saveCurrentNotes(false);
+
                 const fileId = response.result.files[0].id;
                 const fileData = await gapi.client.request({ 
                     path: `https://www.googleapis.com/drive/v3/files/${fileId}`, 
@@ -351,6 +354,29 @@ window.GoogleDriveSync = {
                 
                 if (fileData.body) {
                     const parsedData = JSON.parse(fileData.body);
+
+                    // 🆕 FUSIÓN INTELIGENTE (MERGE)
+                    // Si tenemos notas locales, conservamos las que sean más largas que las de la nube
+                    if (appData && appData.notes) {
+                        for (const key in appData.notes) {
+                            const localHtml = appData.notes[key] || '';
+                            const cloudHtml = parsedData.notes[key] || '';
+                            if (localHtml.length > cloudHtml.length) {
+                                parsedData.notes[key] = localHtml;
+                            }
+                        }
+                    }
+                    
+                    // También conservamos las materias locales si no existen en la nube
+                    if (appData && appData.subjects) {
+                        if (!parsedData.subjects) parsedData.subjects = [];
+                        for (const localSub of appData.subjects) {
+                            const cloudSub = parsedData.subjects.find(s => s.id === localSub.id);
+                            if (!cloudSub) {
+                                parsedData.subjects.push(localSub);
+                            }
+                        }
+                    }
 
                     appData = parsedData;
                     if (typeof saveData === 'function') {
@@ -364,16 +390,17 @@ window.GoogleDriveSync = {
                     }
 
                     if(typeof renderSubjects === 'function') renderSubjects();
+                    if(typeof renderSheetsTabs === 'function') renderSheetsTabs();
                     
                     // Si el usuario tenía una nota u hoja en pantalla, actualiza el texto
                     if (typeof currentState !== 'undefined' && currentState.currentSubject) {
                         const editor = document.getElementById('notes-editor');
                         const key = typeof getSubjectNotesKey === 'function'
-                            ? getSubjectNotesKey(currentState.currentSubject)
+                            ? getSubjectNotesKey(currentState.currentSubject, currentState.currentSheetId)
                             : ('sub_' + currentState.currentSubject);
                         if (editor) editor.innerHTML = appData.notes[key] || '';
                     }
-                    if(typeof showToast === 'function') showToast('Apuntes sincronizados desde la nube', 'success');
+                    if(typeof showToast === 'function') showToast('Apuntes sincronizados inteligentemente', 'success');
                 }
             }
         } catch(e) { 

@@ -43,9 +43,16 @@ async function openGeneralNotes(subId) {
     const sub = appData.subjects.find(s => s.id === subId);
     currentState.currentSubject = subId;
     currentState.currentFileId = null;
+    
+    // Configurar la primera hoja por defecto si no hay ninguna
+    if (!sub.sheets || sub.sheets.length === 0) {
+        sub.sheets = [{ id: 'main', name: 'Hoja Principal' }];
+    }
+    currentState.currentSheetId = sub.sheets[0].id;
 
     document.getElementById('header-title').textContent = `Apuntes: ${sub.name}`;
-    document.getElementById('notes-editor').innerHTML = getSubjectNotesHtml(subId);
+    document.getElementById('notes-editor').innerHTML = getSubjectNotesHtml(subId, currentState.currentSheetId);
+    renderSheetsTabs();
     
     document.getElementById('empty-state').classList.add('hidden');
     document.getElementById('pdf-container').classList.add('hidden');
@@ -88,9 +95,18 @@ async function openFile(subId, fileId) {
 
     currentState.currentSubject = subId;
     currentState.currentFileId = fileId;
+    
+    if (!sub.sheets || sub.sheets.length === 0) {
+        sub.sheets = [{ id: 'main', name: 'Hoja Principal' }];
+    }
+    // Mantener la hoja actual si es la misma materia, o cambiar a la primera
+    if (!currentState.currentSheetId || !sub.sheets.find(s => s.id === currentState.currentSheetId)) {
+        currentState.currentSheetId = sub.sheets[0].id;
+    }
 
     document.getElementById('header-title').textContent = file.name;
-    document.getElementById('notes-editor').innerHTML = getSubjectNotesHtml(subId);
+    document.getElementById('notes-editor').innerHTML = getSubjectNotesHtml(subId, currentState.currentSheetId);
+    renderSheetsTabs();
     
     const sidebar = document.getElementById('sidebar');
     if (window.innerWidth < 768) {
@@ -192,4 +208,97 @@ document.addEventListener('keydown', (e) => {
     if (e.ctrlKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); if (currentState.pdfDoc) changeZoom(e.key === 'ArrowUp' ? 0.1 : -0.1); }
 });
 
-// ==========================================
+// ==========================================
+// FUNCIONES DE HOJAS (SHEETS)
+// ==========================================
+
+function renderSheetsTabs() {
+    const container = document.getElementById('sheets-tabs-container');
+    if (!container || !currentState.currentSubject) return;
+
+    const sub = appData.subjects.find(s => s.id === currentState.currentSubject);
+    if (!sub || !sub.sheets) return;
+
+    container.classList.remove('hidden');
+    let html = '';
+
+    sub.sheets.forEach(sheet => {
+        const isActive = sheet.id === currentState.currentSheetId;
+        const baseClass = "px-3 py-1.5 text-xs font-bold rounded-t-lg transition-colors flex items-center gap-2 cursor-pointer border-t border-l border-r border-transparent";
+        const activeClass = isActive 
+            ? "bg-white text-primary-600 border-slate-200 border-b-white z-10 -mb-px shadow-[0_-2px_4px_rgba(0,0,0,0.02)]" 
+            : "bg-slate-100 text-slate-500 hover:bg-slate-200 border-transparent -mb-px";
+            
+        html += `<div class="${baseClass} ${activeClass}" onclick="switchSheet('${sheet.id}')" ondblclick="renameSheet('${sheet.id}')">
+            <span>${sheet.name}</span>
+            ${sub.sheets.length > 1 ? `<i class="fas fa-times text-[10px] text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full w-4 h-4 flex items-center justify-center transition-colors" onclick="event.stopPropagation(); deleteSheet('${sheet.id}')"></i>` : ''}
+        </div>`;
+    });
+
+    // Botón de nueva hoja
+    html += `<div class="px-3 py-1.5 text-xs font-bold rounded-t-lg bg-transparent text-slate-400 hover:text-primary-500 hover:bg-primary-50 transition-colors flex items-center cursor-pointer mb-0.5" onclick="addNewSheet()">
+        <i class="fas fa-plus"></i>
+    </div>`;
+
+    container.innerHTML = html;
+}
+
+async function switchSheet(sheetId) {
+    if (currentState.currentSheetId === sheetId) return;
+    
+    // Guardar la hoja actual antes de cambiar
+    await saveCurrentNotes(false);
+    
+    currentState.currentSheetId = sheetId;
+    document.getElementById('notes-editor').innerHTML = getSubjectNotesHtml(currentState.currentSubject, sheetId);
+    
+    renderSheetsTabs();
+}
+
+async function addNewSheet() {
+    if (!currentState.currentSubject) return;
+    const sub = appData.subjects.find(s => s.id === currentState.currentSubject);
+    if (!sub) return;
+
+    const sheetId = 'sheet_' + Math.random().toString(36).substring(2, 9);
+    sub.sheets.push({ id: sheetId, name: 'Hoja ' + (sub.sheets.length + 1) });
+    
+    await saveData(true); // guardamos los datos de estructura
+    await switchSheet(sheetId); // switchSheet ya guarda y renderiza
+}
+
+async function renameSheet(sheetId) {
+    if (!currentState.currentSubject) return;
+    const sub = appData.subjects.find(s => s.id === currentState.currentSubject);
+    if (!sub) return;
+    
+    const sheet = sub.sheets.find(s => s.id === sheetId);
+    if (!sheet) return;
+
+    const newName = prompt('Nuevo nombre para la hoja:', sheet.name);
+    if (newName && newName.trim() !== '') {
+        sheet.name = newName.trim();
+        await saveData(true);
+        renderSheetsTabs();
+    }
+}
+
+async function deleteSheet(sheetId) {
+    if (!currentState.currentSubject) return;
+    const sub = appData.subjects.find(s => s.id === currentState.currentSubject);
+    if (!sub || sub.sheets.length <= 1) return;
+
+    if (!confirm('¿Seguro que quieres eliminar esta hoja? Se borrarán sus apuntes.')) return;
+
+    sub.sheets = sub.sheets.filter(s => s.id !== sheetId);
+    delete appData.notes[getSubjectNotesKey(sub.id, sheetId)];
+
+    if (currentState.currentSheetId === sheetId) {
+        currentState.currentSheetId = sub.sheets[0].id;
+        document.getElementById('notes-editor').innerHTML = getSubjectNotesHtml(sub.id, currentState.currentSheetId);
+    }
+    
+    await saveData(true);
+    renderSheetsTabs();
+}
+

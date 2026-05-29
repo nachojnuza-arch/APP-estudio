@@ -7,6 +7,7 @@ let appData = { subjects: [], notes: {} };
 let currentState = {
     currentFileId: null, // Identifica si estamos en una nota general o en un archivo específico
     currentSubject: null,
+    currentSheetId: null,
     expandedSubjects: {},
     expandedAiSubjects: {}, 
     pdfDoc: null,

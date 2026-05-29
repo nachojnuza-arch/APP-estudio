@@ -851,6 +851,13 @@ async function extractTextFromBlob(blob, userNotes = '') {
             let allPages = [];
             let skippedPages = 0;
 
+            const chat = document.getElementById('chat-messages');
+            const progressId = 'prog-' + Math.random().toString(36).substring(7);
+            if (chat) {
+                chat.innerHTML += `<div id="${progressId}" class="msg-ai p-3 shadow-sm text-xs self-start rounded-r-xl rounded-tl-xl bg-slate-50 border border-slate-200"><i class="fas fa-spinner fa-spin text-indigo-500 mr-2"></i> Leyendo PDF y buscando apuntes... (0%)</div>`;
+                chat.scrollTop = chat.scrollHeight;
+            }
+
             // Preparar palabras clave de los apuntes para puntuar páginas enteras (Stage 1)
             let fuzzyKeywords = [];
             if (userNotes && window.LocalSummary && window.LocalSummary.engine) {
@@ -868,6 +875,11 @@ async function extractTextFromBlob(blob, userNotes = '') {
             console.log(`Buscador RAG Fase 1: Escaneando ${totalPagesToScan} páginas buscando contexto relevante...`);
 
             for (let i = 1; i <= totalPagesToScan; i++) {
+                if (chat && i % 5 === 0) {
+                    const el = document.getElementById(progressId);
+                    if (el) el.innerHTML = `<i class="fas fa-spinner fa-spin text-indigo-500 mr-2"></i> Leyendo PDF y buscando apuntes... (${Math.round(i / totalPagesToScan * 100)}%)`;
+                }
+
                 const page = await doc.getPage(i);
                 const textContent = await page.getTextContent();
 
@@ -992,7 +1004,13 @@ async function extractTextFromBlob(blob, userNotes = '') {
                 selectedPages = allPages.slice(0, pagesToKeep);
             }
 
-            const rawText = selectedPages.map(p => p.text).join('\n\n');
+            if (chat) {
+                const el = document.getElementById(progressId);
+                if (el) el.innerHTML = `<i class="fas fa-check text-emerald-500 mr-2"></i> PDF analizado correctamente.`;
+            }
+
+            // 🆕 NUEVO: Agregar etiqueta [Pág X] al inicio de cada página para que la IA sepa citarlo
+            const rawText = selectedPages.map(p => `[Pág ${p.number}]\n${p.text}`).join('\n\n');
 
             // Evitar limpiar aquí porque destruye la estructura, lo limpiamos en LocalSummary (Fase 2)
             const cleanText = rawText;
@@ -1524,14 +1542,16 @@ function summarizeWithAI() {
                 contextMsg = `⚠️ Resumen basado solo en tus apuntes (sin resultados en PDFs).`;
             }
 
-            const prompt = `Actúa como un profesor universitario experto. Tu tarea es evaluar mis apuntes, corregirlos y crear una GUÍA DE ESTUDIO COMPLETA Y COHESIONADA.
+            const prompt = `Actúa como un profesor universitario experto. Tu tarea es evaluar mis apuntes y usar el contexto del libro para crear un MATERIAL DE ESTUDIO FLUIDO, NARRATIVO Y PROFUNDO.
 
 INSTRUCCIONES CRÍTICAS:
-1. CORRECCIÓN Y ANÁLISIS: Revisa mis apuntes originales. Identifica cualquier error, omisión o imprecisión y corrígelo explícitamente en una sección de "Correcciones a los apuntes".
-2. ACLARACIÓN DE CONFUSIONES: Agrega una sección explicando confusiones frecuentes o "trampas" comunes (diagnósticos diferenciales, términos similares) relacionadas con los temas de mis apuntes.
-3. INTEGRACIÓN DE CONTEXTO: Une los fragmentos del contexto (que provienen del libro y pueden estar fragmentados) dándoles un sentido lógico, narrativo y secuencial. Úsalos para expandir y profundizar mis apuntes.
-4. PROFUNDIDAD Y EXTENSIÓN: Desarrolla los temas con nivel universitario. No hagas un resumen corto; escribe párrafos completos. NO dejes la respuesta por la mitad (tienes un límite de palabras muy amplio para extenderte).
-5. ESTRUCTURA: Organiza la respuesta usando títulos en Markdown (###), usa negritas (**) para destacar términos clave. Sigue esta estructura: I. Correcciones, II. Confusiones Frecuentes, III. Desarrollo Completo Integrado.
+1. DESARROLLO FLUIDO Y PROFUNDO: Crea un texto narrativo y explicativo que integre el contexto del libro con mis apuntes. Explica los conceptos en profundidad con nivel universitario. Usa párrafos completos bien desarrollados, evitando listas esquemáticas breves.
+2. CITAS OBLIGATORIAS: Cada vez que incorpores un dato del CONTEXTO DEL LIBRO, cita la página exacta usando las etiquetas proporcionadas (Ej: "[Pág 12]").
+3. CORRECCIONES AL FINAL: Analiza cuidadosamente mis apuntes originales frente a la bibliografía. NO interrumpas la narración para corregirlos. Agrega una sección dedicada EXCLUSIVAMENTE AL FINAL del documento llamada "🚨 Errores de Concepto en tus apuntes" donde expliques de forma didáctica qué estaba mal o incompleto en mis notas y cuál es la versión correcta.
+4. ESTRUCTURA REQUERIDA: 
+   - I. Desarrollo Completo Integrado (narrativo, profundo, con citas al libro)
+   - II. Confusiones Frecuentes (trampas comunes en estos temas)
+   - III. 🚨 Errores de Concepto en tus apuntes (las correcciones de mis notas originales).
 
 📝 MIS APUNTES ORIGINALES:
 ${allNotes.length > 3000 ? allNotes.slice(0, 3000) + '...' : allNotes}

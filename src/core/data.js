@@ -4,38 +4,48 @@ const LS_WORKSPACE_KEY = 'studio_data_v2';
 const LS_WORKSPACE_IDB_FLAG = 'studio_data_v2_idb';
 let _workspaceQuotaToastShown = false;
 
-function getSubjectNotesKey(subId) {
-    return 'sub_' + subId;
+function getSubjectNotesKey(subId, sheetId) {
+    if (!sheetId) return 'sub_' + subId; // Por seguridad si falta
+    return 'sub_' + subId + '_sheet_' + sheetId;
 }
 
-function getSubjectNotesHtml(subId) {
-    return appData.notes[getSubjectNotesKey(subId)] || '';
+function getSubjectNotesHtml(subId, sheetId) {
+    return appData.notes[getSubjectNotesKey(subId, sheetId)] || '';
 }
 
-/** Une apuntes viejos (por archivo / gen_) en una sola hoja por materia. */
+/** Une apuntes viejos y crea la estructura de hojas. */
 function migrateNotesToPerSubject() {
     if (!appData.notes) appData.notes = {};
     appData.subjects.forEach(sub => {
-        const key = getSubjectNotesKey(sub.id);
-        if (appData.notes[key]) return;
+        if (!sub.sheets || !Array.isArray(sub.sheets)) {
+            sub.sheets = [{ id: 'main', name: 'Hoja Principal' }];
+        }
+        if (sub.sheets.length === 0) {
+            sub.sheets.push({ id: 'main', name: 'Hoja Principal' });
+        }
 
-        let merged = '';
+        const oldKey = 'sub_' + sub.id;
+        const newKey = getSubjectNotesKey(sub.id, sub.sheets[0].id);
+
+        let merged = appData.notes[newKey] || appData.notes[oldKey] || '';
+
         const genKey = 'gen_' + sub.id;
-        if (appData.notes[genKey]) merged = appData.notes[genKey];
+        if (appData.notes[genKey]) {
+            merged += (merged ? '<hr><p><br></p>' : '') + appData.notes[genKey];
+            delete appData.notes[genKey];
+        }
 
-        sub.files.forEach(f => {
-            const part = appData.notes[f.id];
-            if (!part) return;
-            if (merged && merged.trim()) {
-                merged += '<hr><p><br></p>' + part;
-            } else {
-                merged = part;
-            }
-            delete appData.notes[f.id];
-        });
+        if (sub.files) {
+            sub.files.forEach(f => {
+                const part = appData.notes[f.id];
+                if (!part) return;
+                merged += (merged ? '<hr><p><br></p>' : '') + part;
+                delete appData.notes[f.id];
+            });
+        }
 
-        if (merged) appData.notes[key] = merged;
-        delete appData.notes[genKey];
+        if (merged) appData.notes[newKey] = merged;
+        delete appData.notes[oldKey];
     });
 }
 
@@ -162,11 +172,11 @@ async function saveData(syncToDrive = true, options = {}) {
     }
 }
 
-/** Una hoja de apuntes por materia (clave sub_ID). forceDrive: subida inmediata a Drive. */
+/** Guarda la hoja de apuntes actual. forceDrive: subida inmediata a Drive. */
 async function saveCurrentNotes(forceDrive = false) {
     const editor = document.getElementById('notes-editor');
-    if (!currentState.currentSubject || !editor) return;
-    appData.notes[getSubjectNotesKey(currentState.currentSubject)] = editor.innerHTML;
+    if (!currentState.currentSubject || !currentState.currentSheetId || !editor) return;
+    appData.notes[getSubjectNotesKey(currentState.currentSubject, currentState.currentSheetId)] = editor.innerHTML;
     try {
         await saveData(true, { forceDrive });
     } catch (err) {
