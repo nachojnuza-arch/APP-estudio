@@ -1261,9 +1261,9 @@ async function getBestModel() {
         const res = await fetch(`/api/gemini?path=models`);
         if (res.ok) {
             const data = await res.json();
-            const bestModel = data.models.find(m => m.name.includes('gemini-2.0-flash') && m.supportedGenerationMethods?.includes('generateContent')) ||
+            const bestModel = data.models.find(m => m.name.includes('gemini-1.5-flash') && m.supportedGenerationMethods?.includes('generateContent')) ||
                               data.models.find(m => m.name.includes('gemini-1.5-pro') && m.supportedGenerationMethods?.includes('generateContent')) ||
-                              data.models.find(m => m.name.includes('gemini-1.5-flash') && m.supportedGenerationMethods?.includes('generateContent')) ||
+                              data.models.find(m => m.name.includes('gemini-2.0-flash') && m.supportedGenerationMethods?.includes('generateContent')) ||
                               data.models.find(m => m.name.includes('gemini') && m.supportedGenerationMethods?.includes('generateContent'));
                               
             if (bestModel) {
@@ -1369,7 +1369,7 @@ return rateLimiter.execute(async () => {
 let lastError;
 
 const dynamicModel = await getBestModel();
-const fallbackModels = [dynamicModel, 'gemini-2.0-flash', 'gemini-1.5-flash'];
+const fallbackModels = [dynamicModel, 'gemini-1.5-pro', 'gemini-1.5-flash'];
 
 for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
@@ -1545,13 +1545,14 @@ function summarizeWithAI() {
             const prompt = `Actúa como un profesor universitario experto. Tu tarea es evaluar mis apuntes y usar el contexto del libro para crear un MATERIAL DE ESTUDIO FLUIDO, NARRATIVO Y PROFUNDO.
 
 INSTRUCCIONES CRÍTICAS:
-1. DESARROLLO FLUIDO Y PROFUNDO: Crea un texto narrativo y explicativo que integre el contexto del libro con mis apuntes. Explica los conceptos en profundidad con nivel universitario. Usa párrafos completos bien desarrollados, evitando listas esquemáticas breves.
-2. CITAS OBLIGATORIAS: Cada vez que incorpores un dato del CONTEXTO DEL LIBRO, cita la página exacta usando las etiquetas proporcionadas (Ej: "[Pág 12]").
-3. CORRECCIONES AL FINAL: Analiza cuidadosamente mis apuntes originales frente a la bibliografía. NO interrumpas la narración para corregirlos. Agrega una sección dedicada EXCLUSIVAMENTE AL FINAL del documento llamada "🚨 Errores de Concepto en tus apuntes" donde expliques de forma didáctica qué estaba mal o incompleto en mis notas y cuál es la versión correcta.
-4. ESTRUCTURA REQUERIDA: 
-   - I. Desarrollo Completo Integrado (narrativo, profundo, con citas al libro)
+1. DESARROLLO FLUIDO Y PROFUNDO: Crea un texto narrativo y explicativo, similar al de un libro de texto. Conecta las ideas con fluidez. EXPLICACIÓN PROFUNDA, nivel universitario.
+2. PROHIBIDO USAR LISTAS O VIÑETAS en el desarrollo principal. Deben ser párrafos completos e hilados. No resumas por fragmentos aislados; integra toda la información en un solo relato coherente.
+3. CITAS OBLIGATORIAS: Cada vez que incorpores un dato del CONTEXTO DEL LIBRO, cita la página exacta al final de la oración (Ej: "[Pág 12]").
+4. CORRECCIONES AL FINAL: Analiza mis apuntes originales frente a la bibliografía. Agrega una sección EXCLUSIVAMENTE AL FINAL llamada "🚨 Errores de Concepto en tus apuntes" donde expliques qué estaba mal o incompleto en mis notas.
+5. ESTRUCTURA REQUERIDA: 
+   - I. Desarrollo Completo Integrado (PÁRRAFOS NARRATIVOS FLUIDOS, PROHIBIDO USAR VIÑETAS)
    - II. Confusiones Frecuentes (trampas comunes en estos temas)
-   - III. 🚨 Errores de Concepto en tus apuntes (las correcciones de mis notas originales).
+   - III. 🚨 Errores de Concepto en tus apuntes.
 
 📝 MIS APUNTES ORIGINALES:
 ${allNotes.length > 3000 ? allNotes.slice(0, 3000) + '...' : allNotes}
