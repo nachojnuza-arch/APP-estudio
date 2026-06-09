@@ -1261,8 +1261,8 @@ async function getBestModel() {
         const res = await fetch(`/api/gemini?path=models`);
         if (res.ok) {
             const data = await res.json();
-            const bestModel = data.models.find(m => m.name.includes('gemini-2.5-flash') && m.supportedGenerationMethods?.includes('generateContent')) ||
-                              data.models.find(m => m.name.includes('gemini-2.0-flash') && m.supportedGenerationMethods?.includes('generateContent')) ||
+            const bestModel = data.models.find(m => m.name.includes('gemini-2.0-flash') && m.supportedGenerationMethods?.includes('generateContent')) ||
+                              data.models.find(m => m.name.includes('gemini-1.5-pro') && m.supportedGenerationMethods?.includes('generateContent')) ||
                               data.models.find(m => m.name.includes('gemini-1.5-flash') && m.supportedGenerationMethods?.includes('generateContent')) ||
                               data.models.find(m => m.name.includes('gemini') && m.supportedGenerationMethods?.includes('generateContent'));
                               
@@ -1369,7 +1369,7 @@ return rateLimiter.execute(async () => {
 let lastError;
 
 const dynamicModel = await getBestModel();
-const fallbackModels = [dynamicModel, 'gemini-1.5-flash-8b', 'gemini-1.5-flash'];
+const fallbackModels = [dynamicModel, 'gemini-2.0-flash', 'gemini-1.5-flash'];
 
 for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
