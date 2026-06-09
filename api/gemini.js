@@ -1,3 +1,5 @@
+export const maxDuration = 60;
+
 export default async function handler(req, res) {
   // Habilitar CORS si es necesario (útil para desarrollo local)
   res.setHeader('Access-Control-Allow-Origin', '*');
