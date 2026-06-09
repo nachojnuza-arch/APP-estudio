@@ -190,20 +190,21 @@ Tengo estos APUNTES PERSONALES que escribí de clase:
 ${userNotes}
 ---
 
-Y este es el TEXTO EXTRAÍDO de un libro de medicina:
+Y este es el TEXTO EXTRAÍDO de un libro/PDF:
 ---
 ${extractedText}
 ---
 
-Por favor, CREÁ UN RESUMEN DE ESTUDIO que:
-1. Use MIS APUNTES como estructura principal
-2. Complete la información con el texto del libro
-3. Sea claro, legible y bien organizado
-4. Use lenguaje médico pero comprensible
-5. Incluya los conceptos clave que menciono en mis apuntes
-6. NO incluyas números de página, figuras, ni referencias bibliográficas
+Por favor, CREÁ UN RESUMEN DE ESTUDIO COMPLETO que siga estas reglas:
+1. Usa MIS APUNTES como base y estructura principal.
+2. A partir de mis apuntes, extrae y desarrolla de forma clara y exhaustiva todo el contenido relevante presente en el TEXTO EXTRAÍDO de los PDFs.
+3. El resumen debe ser profundo, fluido de leer y bien organizado.
+4. Usa lenguaje médico pero comprensible.
+5. NO incluyas números de página, figuras, ni referencias bibliográficas.
+6. Al final del resumen, agrega una sección breve marcando cualquier ERROR DE CONCEPTO que hayas encontrado en mis apuntes en comparación con los PDFs.
+7. IMPORTANTE: Asegúrate de finalizar el texto por completo, no dejes el resumen cortado a la mitad.
 
-El resumen debe estar en español y ser útil para estudiar.`;
+El resumen debe estar en español.`;
 
     try {
         const response = await fetch(API_URL, {
@@ -221,7 +222,7 @@ El resumen debe estar en español y ser útil para estudiar.`;
                     temperature: 0.3,
                     topK: 40,
                     topP: 0.95,
-                    maxOutputTokens: 4096,
+                    maxOutputTokens: 8192,
                 }
             })
         });
