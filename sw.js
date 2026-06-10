@@ -1,4 +1,4 @@
-const CACHE_NAME = 'apuntes-facultad-cache-v13';
+const CACHE_NAME = 'apuntes-facultad-cache-v16';
 
 // 1. Lista actualizada con la nueva estructura de carpetas
 const FILES_TO_CACHE = [
@@ -19,11 +19,7 @@ const FILES_TO_CACHE = [
   './src/ui/export.js',
   './src/ui/render.js',
   './src/ui/utils.js',
-  './src/ai/config-dict.js',
-  './src/ai/local-init.js',
-  './src/ai/summary-engine.js',
-  './src/ai/tfidf-vectors.js',
-  './src/ai/utils-translate.js',
+  './src/ai/transformers-engine.js',
   './app_logo.png',
   './icon-96.png',
   './icon-192.png',

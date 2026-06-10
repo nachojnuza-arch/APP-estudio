@@ -4,7 +4,7 @@ const idb = {
     db: null,
     init() {
         return new Promise((resolve, reject) => {
-            const req = indexedDB.open('StudyStudioDB', 2);
+            const req = indexedDB.open('StudyStudioDB', 3);
             req.onupgradeneeded = (e) => {
                 const db = e.target.result;
                 if (!db.objectStoreNames.contains('pdfs')) {
@@ -12,6 +12,9 @@ const idb = {
                 }
                 if (!db.objectStoreNames.contains('workspace')) {
                     db.createObjectStore('workspace');
+                }
+                if (!db.objectStoreNames.contains('embeddings')) {
+                    db.createObjectStore('embeddings');
                 }
             };
             req.onsuccess = (e) => { this.db = e.target.result; resolve(); };
@@ -64,13 +67,31 @@ const idb = {
             req.onerror = () => resolve(null);
         });
     },
+    async saveEmbedding(id, data) {
+        return new Promise((resolve, reject) => {
+            if (!this.db.objectStoreNames.contains('embeddings')) return resolve();
+            const tx = this.db.transaction('embeddings', 'readwrite');
+            tx.objectStore('embeddings').put(data, id);
+            tx.oncomplete = resolve;
+            tx.onerror = () => reject(tx.error);
+        });
+    },
+    async getEmbedding(id) {
+        return new Promise((resolve) => {
+            if (!this.db.objectStoreNames.contains('embeddings')) return resolve(null);
+            const tx = this.db.transaction('embeddings', 'readonly');
+            const req = tx.objectStore('embeddings').get(id);
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => resolve(null);
+        });
+    },
     async clearAllStores() {
         return new Promise((resolve) => {
             if (!this.db) {
                 resolve();
                 return;
             }
-            const names = ['workspace', 'pdfs'];
+            const names = ['workspace', 'pdfs', 'embeddings'];
             let i = 0;
             const step = () => {
                 if (i >= names.length) {

@@ -411,204 +411,47 @@ function formatContextByTopic(topicGroups) {
     return context.trim() || null;
 }
 
-// 🆕 FUNCIÓN PRINCIPAL: Generar resumen ejecutivo basado en apuntes del usuario
+// 🆕 FUNCIÓN PRINCIPAL: Buscar fragmentos relevantes (RAG) usando el motor neuronal
 async function extractGuidedSources(notesText, options = {}) {
-    const config = { ...FILTER_CONFIG, ...options };
-
-    // PASO 1: Extraer conceptos clave de los apuntes del usuario
-    const concepts = extractKeyConceptsFromNotes(notesText, config.maxKeyTerms);
-    if (concepts.length === 0) return null;
-
-    console.log(`📝 Conceptos extraídos de tus apuntes: ${concepts.length}`);
-    console.log('  →', concepts.slice(0, 5).map(c => `"${c.text}"`).join(', '));
-
-    // PASO 2: Extraer TODO el texto de las fuentes seleccionadas
-    const allChunks = [];
-    let sourcesProcessed = 0;
-
-    for (const fileId of aiSourceFileIds) {
-        let file = null;
-        for (const sub of appData.subjects) {
-            const found = sub.files.find(f => f.id === fileId);
-            if (found) { file = found; break; }
-        }
-        if (!file || file.type !== 'pdf') continue;
-
-        try {
-            let fullText = '';
-
-            let blob = await idb.get(fileId);
-            if (!blob && file.driveId && window.GoogleDriveSync && window.GoogleDriveSync.isLoggedIn) {
-                console.log(`☁️ Descargando ${file.name} desde Google Drive para la IA...`);
-                blob = await window.GoogleDriveSync.downloadPdfFromDrive(file.driveId);
-            }
-            
-            if (!blob) {
-                if (!file.isLocal && !file.driveId) {
-                    console.log(`⚠ URLs externas no se pueden extraer sin backend: ${file.url}`);
-                } else {
-                    console.log(`⚠ No se pudo obtener el archivo ${file.name}`);
-                }
-                continue;
-            }
-            
-            fullText = await extractTextFromBlob(blob);
-
-            if (!fullText || fullText.trim().length < 50) continue;
-
-            const chunks = smartChunkText(fullText, file.name, {
-                maxChunkSize: config.chunkSize,
-                overlap: config.chunkOverlap,
-                minParagraphLength: config.minParagraphLength
-            });
-            allChunks.push(...chunks);
-            sourcesProcessed++;
-        } catch(e) {
-            console.warn(`⚠ Error extrayendo ${file.name}:`, e);
+    if (!window.TransformersEngine) return null;
+    
+    // Determinar qué PDFs usar
+    let fileIds = [];
+    if (typeof aiSourceFileIds !== 'undefined' && aiSourceFileIds.size > 0) {
+        fileIds = [...aiSourceFileIds];
+    } else if (currentState.currentSubject) {
+        const sub = appData.subjects.find(s => s.id === currentState.currentSubject);
+        if (sub) {
+            fileIds = sub.files.filter(f => f.type === 'pdf').map(f => f.id);
         }
     }
-
-    if (allChunks.length === 0) return null;
-
-    // PASO 3: Filtrar glosarios y contenido basura
-    const qualityChunks = allChunks.filter(esChunkUtilizable);
-    console.log(`✅ Filtrado de calidad: ${allChunks.length} → ${qualityChunks.length} chunks válidos`);
-
-    if (qualityChunks.length === 0) {
-        console.warn('⚠️ No se encontraron chunks de calidad después del filtrado');
+    
+    if (fileIds.length === 0) {
+        console.warn('⚠️ No hay PDFs para buscar contexto.');
         return null;
     }
 
-    // PASO 4: Para CADA CONCEPTO de tus apuntes, buscar los mejores párrafos explicativos
-    const conceptMatches = [];
-
-    for (const concept of concepts) {
-        const conceptText = concept.text.toLowerCase();
-        const conceptTerms = tokenize(conceptText);
-
-        // Scorear todos los chunks contra este concepto
-        const scoredForConcept = qualityChunks.map(chunk => {
-            let score = 0;
-            const chunkWords = chunk.words;
-            const chunkTextLower = chunk.text.toLowerCase();
-
-            // Match exacto del concepto completo
-            if (chunkTextLower.includes(conceptText)) {
-                score += 5.0 * concept.weight;
-            }
-
-            // Match de términos individuales del concepto
-            conceptTerms.forEach(term => {
-                if (chunkWords.has(term)) {
-                    score += 2.0 * concept.weight;
-                } else if (chunkWords.has(term + 's') || chunkWords.has(term + 'es')) {
-                    score += 1.0 * concept.weight;
-                } else {
-                    // Fuzzy matching
-                    const fuzzyScore = fuzzyMatchInText(term, chunk.text, 0.7);
-                    if (fuzzyScore > 0) {
-                        score += 1.2 * concept.weight * fuzzyScore;
-                    }
-                }
-            });
-
-            // Bonus por calidad del párrafo
-            const sentenceCount = (chunk.text.match(/[.!?]+/g) || []).length;
-            if (sentenceCount >= 3) score += 2.0;
-            else if (sentenceCount >= 2) score += 1.0;
-
-            if (chunk.text.length > 250) score += 1.5;
-            else if (chunk.text.length < 120) score -= 1.5;
-
-            // Penalizar siglas
-            const words = chunk.text.split(/\s+/).filter(w => w.length > 0);
-            if (words.length > 5) {
-                const siglas = words.filter(w => /^[A-ZÁÉÍÓÚÑ]{2,5}$/.test(w)).length;
-                const siglaRatio = siglas / words.length;
-                if (siglaRatio > 0.15) score -= siglaRatio * 5;
-            }
-
-            return { ...chunk, score };
+    try {
+        const maxChunks = options.maxChunks || 15;
+        console.log(`🧠 RAG Semántico: Buscando los ${maxChunks} mejores fragmentos...`);
+        
+        // Extraemos solo los chunks más relevantes usando el modelo de embeddings
+        const relevantChunks = await window.TransformersEngine.searchRelevantChunks(notesText, fileIds, maxChunks);
+        
+        if (!relevantChunks || relevantChunks.length === 0) return null;
+        
+        // Construimos el contexto
+        let context = '';
+        relevantChunks.forEach((chunk, i) => {
+            context += `[Fragmento ${i+1}]:\n${chunk.text}\n\n`;
         });
-
-        // Tomar los 2-3 mejores chunks para este concepto
-        const bestMatches = scoredForConcept
-            .filter(c => c.score >= config.minRelevanceScore)
-            .sort((a, b) => b.score - a.score)
-            .slice(0, 3);
-
-        if (bestMatches.length > 0) {
-            conceptMatches.push({
-                concept: concept.text,
-                conceptType: concept.type,
-                conceptWeight: concept.weight,
-                matches: bestMatches
-            });
-        }
+        
+        console.log(`✅ Contexto temático extraído: ${relevantChunks.length} fragmentos.`);
+        return context.trim();
+    } catch (e) {
+        console.error("Error en RAG Semántico:", e);
+        return null;
     }
-
-    if (conceptMatches.length === 0) return null;
-
-    console.log(`📊 ${conceptMatches.length} conceptos con matches encontrados`);
-
-    // PASO 5: Generar resumen ejecutivo estructurado
-    return buildExecutiveSummary(conceptMatches, notesText, sourcesProcessed);
-}
-
-// 🆕 Construir resumen ejecutivo para estudio
-function buildExecutiveSummary(conceptMatches, originalNotes, sourcesCount) {
-    let summary = '';
-    let totalTokens = 0;
-    const maxTokens = FILTER_CONFIG.maxTokens;
-
-    // HEADER del resumen
-    summary += `╔══════════════════════════════════════════════════════════╗\n`;
-    summary += `║       📖 RESUMEN EJECUTIVO - MATERIAL DE ESTUDIO       ║\n`;
-    summary += `╚══════════════════════════════════════════════════════════╝\n\n`;
-    summary += `📚 Fuentes analizadas: ${sourcesCount} archivo(s)\n`;
-    summary += `📝 Conceptos clave extraídos: ${conceptMatches.length}\n`;
-    summary += `🎯 Objetivo: Repaso claro y completo del tema\n\n`;
-    summary += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
-
-    totalTokens += Math.ceil(summary.length / 4);
-
-    // DESARROLLO: Cada concepto con su explicación de las fuentes
-    for (const cm of conceptMatches) {
-        if (totalTokens > maxTokens) break;
-
-        // Título del concepto
-        const icon = cm.conceptType === 'phrase' ? '💡' : cm.conceptType === 'line' ? '📌' : '🔑';
-        const conceptHeader = `${icon} ${cm.concept.toUpperCase()}\n`;
-        const headerTokens = Math.ceil(conceptHeader.length / 4);
-        if (totalTokens + headerTokens > maxTokens) break;
-
-        summary += conceptHeader;
-        summary += `─`.repeat(conceptHeader.length - 1) + `\n\n`;
-        totalTokens += headerTokens;
-
-        // Agregar los párrafos explicativos de las fuentes
-        const usedSources = new Set();
-        for (const match of cm.matches) {
-            const sourceKey = `${match.source} (pág. ~${match.page})`;
-            
-            // Evitar repetir la misma fuente más de 2 veces para el mismo concepto
-            if (usedSources.has(sourceKey) && usedSources.has(sourceKey + '_2')) continue;
-            usedSources.add(sourceKey + (usedSources.has(sourceKey) ? '_2' : ''));
-
-            const chunkTokens = match.tokenEstimate || Math.ceil(match.text.length / 4);
-            if (totalTokens + chunkTokens + 20 > maxTokens) break;
-
-            summary += `   📄 ${sourceKey}\n`;
-            summary += `   ${match.text}\n\n`;
-            totalTokens += chunkTokens + 5;
-        }
-
-        summary += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
-        totalTokens += 15;
-    }
-
-    console.log(`✅ Resumen ejecutivo generado: ~${totalTokens} tokens, ${conceptMatches.length} conceptos`);
-    return summary.trim();
 }
 
 // 🆕 FUNCIÓN: Verificar si una línea es basura/metadata
@@ -841,7 +684,7 @@ function esIndice(texto) {
 }
 
 // 🆕 FUNCIÓN PRINCIPAL: Extraer texto limpio de PDF con Búsqueda de Dos Etapas (RAG)
-async function extractTextFromBlob(blob, userNotes = '') {
+async function extractTextFromBlob(blob, userNotes = '', silent = false) {
     return new Promise(async (resolve) => {
         try {
             const arrayBuffer = await blob.arrayBuffer();
@@ -853,29 +696,19 @@ async function extractTextFromBlob(blob, userNotes = '') {
 
             const chat = document.getElementById('chat-messages');
             const progressId = 'prog-' + Math.random().toString(36).substring(7);
-            if (chat) {
+            if (chat && !silent) {
                 chat.innerHTML += `<div id="${progressId}" class="msg-ai p-3 shadow-sm text-xs self-start rounded-r-xl rounded-tl-xl bg-slate-50 border border-slate-200"><i class="fas fa-spinner fa-spin text-indigo-500 mr-2"></i> Leyendo PDF y buscando apuntes... (0%)</div>`;
                 chat.scrollTop = chat.scrollHeight;
             }
 
-            // Preparar palabras clave de los apuntes para puntuar páginas enteras (Stage 1)
+            // (Lógica de palabras clave TF-IDF eliminada)
             let fuzzyKeywords = [];
-            if (userNotes && window.LocalSummary && window.LocalSummary.engine) {
-                const keywords = window.LocalSummary.engine.extractKeywordsFromNotes(userNotes);
-                fuzzyKeywords = keywords.map(k => {
-                    const isBigram = k.includes(' ');
-                    return {
-                        stem: isBigram ? k.toLowerCase() : (k.length >= 6 ? k.substring(0, 5).toLowerCase() : k.toLowerCase()),
-                        weight: isBigram ? 10.0 : (k.length >= 7 ? 4.0 : 1.0)
-                    };
-                });
-            }
 
             const totalPagesToScan = doc.numPages;
-            console.log(`Buscador RAG Fase 1: Escaneando ${totalPagesToScan} páginas buscando contexto relevante...`);
+            if (!silent) console.log(`Buscador RAG Fase 1: Escaneando ${totalPagesToScan} páginas buscando contexto relevante...`);
 
             for (let i = 1; i <= totalPagesToScan; i++) {
-                if (chat && i % 5 === 0) {
+                if (chat && !silent && i % 5 === 0) {
                     const el = document.getElementById(progressId);
                     if (el) el.innerHTML = `<i class="fas fa-spinner fa-spin text-indigo-500 mr-2"></i> Leyendo PDF y buscando apuntes... (${Math.round(i / totalPagesToScan * 100)}%)`;
                 }
@@ -1542,22 +1375,18 @@ function summarizeWithAI() {
                 contextMsg = `⚠️ Resumen basado solo en tus apuntes (sin resultados en PDFs).`;
             }
 
-            const prompt = `Actúa como un profesor universitario experto. Tu tarea es evaluar mis apuntes y usar el contexto del libro para crear un MATERIAL DE ESTUDIO FLUIDO, NARRATIVO Y PROFUNDO.
+            const prompt = `Actúa como un editor de texto experto. Tu única tarea es unir los siguientes FRAGMENTOS EXTRAÍDOS en un solo texto narrativo y coherente, estructurado con base en MIS APUNTES.
 
-INSTRUCCIONES CRÍTICAS:
-1. DESARROLLO FLUIDO Y PROFUNDO: Crea un texto narrativo y explicativo, similar al de un libro de texto. Conecta las ideas con fluidez. EXPLICACIÓN PROFUNDA, nivel universitario.
-2. PROHIBIDO USAR LISTAS O VIÑETAS en el desarrollo principal. Deben ser párrafos completos e hilados. No resumas por fragmentos aislados; integra toda la información en un solo relato coherente.
-3. CITAS OBLIGATORIAS: Cada vez que incorpores un dato del CONTEXTO DEL LIBRO, cita la página exacta al final de la oración (Ej: "[Pág 12]").
-4. CORRECCIONES AL FINAL: Analiza mis apuntes originales frente a la bibliografía. Agrega una sección EXCLUSIVAMENTE AL FINAL llamada "🚨 Errores de Concepto en tus apuntes" donde expliques qué estaba mal o incompleto en mis notas.
-5. ESTRUCTURA REQUERIDA: 
-   - I. Desarrollo Completo Integrado (PÁRRAFOS NARRATIVOS FLUIDOS, PROHIBIDO USAR VIÑETAS)
-   - II. Confusiones Frecuentes (trampas comunes en estos temas)
-   - III. 🚨 Errores de Concepto en tus apuntes.
+INSTRUCCIONES CRÍTICAS (AHORRO DE TOKENS):
+1. NO inventes ni agregues información que no esté en los fragmentos.
+2. NO reescribas extensamente. Solo usa conectores lógicos ("Además,", "Por consiguiente,") para unir los párrafos y que fluyan con sentido.
+3. El resultado debe ser corto, denso en información y directo al punto.
+4. MANTÉN el formato markdown básico. NO uses listas interminables si los fragmentos no las tienen.
 
-📝 MIS APUNTES ORIGINALES:
+📝 MIS APUNTES (Usa esto como guía temática):
 ${allNotes.length > 3000 ? allNotes.slice(0, 3000) + '...' : allNotes}
 
-📚 CONTEXTO DEL LIBRO (Fragmentos extraídos):
+📚 FRAGMENTOS EXTRAÍDOS (Une estos fragmentos con sentido):
 ${contextForAI}`;
 
             console.log(`📏 Prompt size: ~${Math.ceil(prompt.length / 4)} tokens`);
@@ -1959,7 +1788,7 @@ async function generarResumenDirecto() {
 
     if (!userNotes || userNotes.length < 15) {
         chat.innerHTML += `<div class="msg-user p-3 shadow-sm text-sm self-end max-w-[85%] rounded-l-xl rounded-tr-xl bg-emerald-600 text-white">Generá un resumen directo de mis PDFs.</div>`;
-        chat.innerHTML += `<div class="msg-ai p-4 shadow-sm text-sm self-start max-w-[95%] rounded-r-xl rounded-tl-xl bg-amber-50 border border-amber-200 text-amber-700">⚠️ <strong>Necesitás escribir apuntes primero.</strong> El sistema local (sin IA) usa tus apuntes para guiar qué partes del PDF debe resumir.</div>`;
+        chat.innerHTML += `<div class="msg-ai p-4 shadow-sm text-sm self-start max-w-[95%] rounded-r-xl rounded-tl-xl bg-amber-50 border border-amber-200 text-amber-700">⚠️ <strong>Necesitás escribir apuntes primero.</strong> La inteligencia artificial buscará contenido semánticamente similar a tus apuntes.</div>`;
         chat.scrollTop = chat.scrollHeight;
         return;
     }
@@ -1970,6 +1799,13 @@ async function generarResumenDirecto() {
 
     setTimeout(async () => {
         try {
+            if (!window.TransformersEngine) {
+                throw new Error("El motor de IA local no está inicializado.");
+            }
+
+            // Iniciar la descarga/carga del modelo en background mientras extraemos texto
+            window.TransformersEngine.initModel();
+
             // Determinar qué PDFs usar
             let fileIds = [];
             if (typeof aiSourceFileIds !== 'undefined' && aiSourceFileIds.size > 0) {
@@ -1988,9 +1824,9 @@ async function generarResumenDirecto() {
                 return;
             }
 
-            let combinedText = '';
+            let allTextChunksWithFileId = [];
+
             for (const fileId of fileIds) {
-                // Primero buscamos el objeto del archivo completo para saber si es local o Drive
                 let file = null;
                 for (const sub of appData.subjects) {
                     const found = sub.files.find(f => f.id === fileId);
@@ -2007,32 +1843,50 @@ async function generarResumenDirecto() {
                     
                     if (!blob) continue;
 
-                    const text = await extractTextFromBlob(blob, userNotes);
-                    if (text) {
-                        combinedText += text + '\n\n';
+                    // Extraer TODO el texto del PDF pasando un userNotes vacío para evitar el RAG pre-filtro antiguo
+                    const text = await extractTextFromBlob(blob, '');
+                    if (text && text.trim().length > 50) {
+                        // Chunking inteligente
+                        const chunks = smartChunkText(text, file.name);
+                        chunks.forEach(c => {
+                            c.fileId = fileId;
+                            allTextChunksWithFileId.push(c);
+                        });
                     }
                 } catch (err) {
                     console.warn('No se pudo extraer texto de', file.name, err);
                 }
             }
 
-            if (combinedText.trim().length < 50) {
+            if (allTextChunksWithFileId.length === 0) {
                 chat.innerHTML += `<div class="msg-ai p-4 shadow-sm text-sm self-start max-w-[95%] rounded-r-xl rounded-tl-xl bg-amber-50 border border-amber-200 text-amber-700">⚠️ No se pudo extraer texto de los PDFs. Asegúrate de tener conexión.</div>`;
                 if (typing) typing.classList.add('hidden');
                 chat.scrollTop = chat.scrollHeight;
                 return;
             }
 
-            // Usar el sistema de resúmenes locales
-            const summaryText = window.LocalSummary.generate(combinedText, userNotes, 'PRECISE');
+            // Mostrar estado
+            chat.innerHTML += `<div class="msg-ai p-3 shadow-sm text-xs self-start rounded-r-xl rounded-tl-xl bg-slate-50 border border-slate-200"><i class="fas fa-brain text-indigo-500 mr-2"></i> Generando embeddings semánticos y buscando similitudes...</div>`;
+            chat.scrollTop = chat.scrollHeight;
 
-            // Formatear para HTML con diseño de tarjetas
-            const paragraphsHtml = summaryText.split('\n\n').map(p => {
-                if (!p.trim()) return '';
-                const isBullet = p.trim().startsWith('🔹');
-                const style = isBullet ? "text-slate-700 bg-white p-5 rounded-xl border border-slate-200 shadow-sm mb-4 leading-relaxed" : "text-slate-700 mb-4";
-                return `<p class="${style}">${p}</p>`;
+            // Búsqueda Semántica
+            const relevantChunks = await window.TransformersEngine.searchRelevantChunks(userNotes, allTextChunksWithFileId, 8);
+
+            // Formatear para HTML
+            let paragraphsHtml = relevantChunks.map(res => {
+                return `
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm mb-4">
+                    <div class="text-xs font-bold text-indigo-500 mb-2 uppercase tracking-wide flex justify-between">
+                        <span><i class="fas fa-file-pdf"></i> ${res.chunk.source} (pág. ~${res.chunk.page})</span>
+                        <span class="text-emerald-500"><i class="fas fa-bullseye"></i> ${Math.round(res.score * 100)}% Match</span>
+                    </div>
+                    <p class="text-slate-700 leading-relaxed">${res.chunk.text}</p>
+                </div>`;
             }).join('');
+
+            if (relevantChunks.length === 0) {
+                paragraphsHtml = `<div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm text-slate-700">No se encontró contenido relevante en los PDFs para tus apuntes actuales.</div>`;
+            }
 
             const htmlContent = `
                 <div class="max-w-none bg-slate-50 p-2 rounded-lg">
@@ -2040,13 +1894,13 @@ async function generarResumenDirecto() {
                 </div>
             `;
 
-            openAIFullscreen(htmlContent, `Resumen Local`);
+            openAIFullscreen(htmlContent, `Resumen Inteligente (Local IA)`);
 
-            chat.innerHTML += `<div class="msg-ai p-4 shadow-sm text-sm self-start max-w-[95%] rounded-r-xl rounded-tl-xl leading-relaxed bg-emerald-50 border border-emerald-200">✅ <strong>Resumen generado</strong> usando el modelo TF-IDF local. Abrí pantalla completa para revisarlo.</div>`;
-            showToast(`✅ Resumen generado exitosamente`, 'success');
+            chat.innerHTML += `<div class="msg-ai p-4 shadow-sm text-sm self-start max-w-[95%] rounded-r-xl rounded-tl-xl leading-relaxed bg-emerald-50 border border-emerald-200">✅ <strong>Resumen generado</strong> usando Inteligencia Artificial Semántica (Transformers.js) directamente en tu navegador. Abrí pantalla completa para revisarlo.</div>`;
+            showToast(`✅ Resumen semántico generado exitosamente`, 'success');
 
         } catch (e) {
-            console.error('Error resumen directo:', e);
+            console.error('Error resumen semántico:', e);
             chat.innerHTML += `<div class="msg-ai border-red-200 bg-red-50 text-red-700 p-3 shadow-sm text-sm self-start rounded-xl"><i class="fas fa-exclamation-triangle"></i> ${e.message || e}</div>`;
             showToast('⚠️ Error al generar resumen', 'error');
         } finally {
