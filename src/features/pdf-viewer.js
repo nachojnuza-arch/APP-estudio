@@ -59,6 +59,12 @@ async function openGeneralNotes(subId) {
     document.getElementById('video-container').classList.add('hidden');
     document.getElementById('pdf-controls').classList.add('hidden');
     
+    // 🆕 Pre-cargar vectores en background
+    if (window.TransformersEngine && window.TransformersEngine.prewarmAIFiles) {
+        const fileIds = sub.files.filter(f => f.type === 'pdf').map(f => f.id);
+        if (fileIds.length > 0) window.TransformersEngine.prewarmAIFiles(fileIds);
+    }
+    
     const dashboard = document.getElementById('subject-dashboard');
     if (dashboard) {
         dashboard.classList.remove('hidden');
@@ -118,6 +124,12 @@ async function openFile(subId, fileId) {
     setTimeout(() => { if (currentState.pdfDoc) renderPage(); }, 300);
     
     renderSubjects();
+
+    // 🆕 Pre-cargar vectores en background
+    if (window.TransformersEngine && window.TransformersEngine.prewarmAIFiles) {
+        const fileIds = sub.files.filter(f => f.type === 'pdf').map(f => f.id);
+        if (fileIds.length > 0) window.TransformersEngine.prewarmAIFiles(fileIds);
+    }
 
     document.getElementById('empty-state').classList.add('hidden');
     document.getElementById('subject-dashboard')?.classList.add('hidden');
