@@ -9,8 +9,8 @@ export const config = {
   maxDuration: 60,
 };
 
-function hashPin(pin) {
-  return crypto.createHash('sha256').update(String(pin || '')).digest('hex');
+function hashString(str) {
+  return crypto.createHash('sha256').update(String(str || '').trim().toLowerCase()).digest('hex');
 }
 
 export default async function handler(req, res) {
@@ -31,7 +31,7 @@ export default async function handler(req, res) {
   const rawPin = req.headers['x-user-pin'] || req.query.pin || (req.body && req.body.pin) || '';
   
   const userId = String(rawUserId).replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase().trim();
-  const userPinHash = rawPin ? hashPin(rawPin) : '';
+  const userPinHash = rawPin ? hashString(rawPin) : '';
 
   const authHeader = 'Basic ' + Buffer.from(`${ncUser}:${token}`).toString('base64');
   const webdavRoot = `${baseUrl}/remote.php/dav/files/${encodeURIComponent(ncUser)}/${encodeURIComponent(baseDir)}`;
@@ -78,41 +78,18 @@ export default async function handler(req, res) {
     }
   }
 
-  // Verificar o Registrar PIN del usuario
-  async function verifyUserAuth() {
-    if (!userId) {
-      return { ok: false, error: 'Usuario no especificado' };
-    }
-    
-    await ensureFolder(`${webdavRoot}/users`);
-    await ensureFolder(userRoot);
-
+  async function getStoredAuth() {
+    if (!userId) return null;
     const authFileUrl = `${userRoot}/auth.json`;
     try {
       const check = await davFetch(authFileUrl, { method: 'GET' });
-      if (check.status === 404) {
-        // Registro automático: si no existe, guardamos el hash del PIN
-        if (userPinHash) {
-          const authData = JSON.stringify({ userId, pinHash: userPinHash, createdAt: Date.now() }, null, 2);
-          await davFetch(authFileUrl, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: authData
-          });
-        }
-        return { ok: true, isNew: true };
-      }
       if (check.ok) {
-        const stored = await check.json();
-        if (stored.pinHash && stored.pinHash !== userPinHash) {
-          return { ok: false, error: 'PIN o contraseña incorrecta para este usuario.' };
-        }
-        return { ok: true, isNew: false };
+        return await check.json();
       }
     } catch (e) {
-      console.warn('Error validando auth:', e);
+      // Ignore
     }
-    return { ok: true };
+    return null;
   }
 
   try {
@@ -129,22 +106,87 @@ export default async function handler(req, res) {
       }
     }
 
-    // 2. INICIAR SESIÓN / VALIDAR CREDENCIALES
-    if (action === 'auth') {
-      const authResult = await verifyUserAuth();
-      if (!authResult.ok) {
-        return res.status(401).json({ success: false, error: authResult.error });
+    // 2. CREAR CUENTA (REGISTRO EXPLÍCITO)
+    if (action === 'register' && req.method === 'POST') {
+      if (!userId || !rawPin) {
+        return res.status(400).json({ error: 'Debes ingresar un nombre de usuario y una contraseña.' });
       }
-      return res.status(200).json({ success: true, userId, isNew: !!authResult.isNew });
+      
+      await ensureFolder(`${webdavRoot}/users`);
+      await ensureFolder(userRoot);
+
+      const existingAuth = await getStoredAuth();
+      if (existingAuth) {
+        return res.status(400).json({ error: 'Este nombre de usuario ya está registrado. Por favor inicia sesión.' });
+      }
+
+      const recoveryKey = req.body.recoveryKey || req.query.recoveryKey || '';
+      const authData = JSON.stringify({
+        userId,
+        pinHash: userPinHash,
+        recoveryHash: recoveryKey ? hashString(recoveryKey) : '',
+        createdAt: Date.now()
+      }, null, 2);
+
+      await davFetch(`${userRoot}/auth.json`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: authData
+      });
+
+      return res.status(200).json({ success: true, userId, message: 'Usuario creado exitosamente.' });
     }
 
-    // Para cualquier acción de datos, requerimos usuario autenticado
-    const authCheck = await verifyUserAuth();
-    if (!authCheck.ok) {
-      return res.status(401).json({ error: authCheck.error });
+    // 3. RECUPERAR CONTRASEÑA
+    if (action === 'recover' && req.method === 'POST') {
+      const recoveryKey = req.body.recoveryKey || req.query.recoveryKey || '';
+      const newPin = req.body.newPin || req.query.newPin || '';
+
+      if (!userId || !recoveryKey || !newPin) {
+        return res.status(400).json({ error: 'Faltan datos para la recuperación.' });
+      }
+
+      const storedAuth = await getStoredAuth();
+      if (!storedAuth) {
+        return res.status(404).json({ error: 'El usuario especificado no existe.' });
+      }
+
+      if (!storedAuth.recoveryHash || storedAuth.recoveryHash !== hashString(recoveryKey)) {
+        return res.status(401).json({ error: 'La palabra clave o respuesta de recuperación es incorrecta.' });
+      }
+
+      storedAuth.pinHash = hashString(newPin);
+      storedAuth.updatedAt = Date.now();
+
+      await davFetch(`${userRoot}/auth.json`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(storedAuth, null, 2)
+      });
+
+      return res.status(200).json({ success: true, message: 'Contraseña restablecida correctamente. Ya puedes iniciar sesión.' });
     }
 
-    // 3. OBTENER WORKSPACE
+    // 4. INICIAR SESIÓN / VALIDACIÓN
+    if (action === 'login' || action === 'auth') {
+      if (!userId) return res.status(400).json({ error: 'Ingresa un usuario' });
+      const storedAuth = await getStoredAuth();
+      if (!storedAuth) {
+        return res.status(404).json({ error: 'El usuario no existe. Por favor crea una cuenta primero.' });
+      }
+      if (storedAuth.pinHash && storedAuth.pinHash !== userPinHash) {
+        return res.status(401).json({ error: 'Contraseña o PIN incorrecto.' });
+      }
+      return res.status(200).json({ success: true, userId });
+    }
+
+    // Para acciones de datos, validar credenciales
+    const storedAuth = await getStoredAuth();
+    if (!storedAuth || (storedAuth.pinHash && storedAuth.pinHash !== userPinHash)) {
+      return res.status(401).json({ error: 'No autorizado. Inicia sesión con tus credenciales.' });
+    }
+
+    // 5. OBTENER WORKSPACE
     if (action === 'getWorkspace') {
       const fileUrl = `${userRoot}/workspace_data.json`;
       const resp = await davFetch(fileUrl, { method: 'GET' });
@@ -158,7 +200,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ exists: true, data, userId });
     }
 
-    // 4. GUARDAR WORKSPACE
+    // 6. GUARDAR WORKSPACE
     if (action === 'putWorkspace' && req.method === 'POST') {
       await ensureUserHierarchy();
       const payload = req.body.data || req.body;
@@ -177,7 +219,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, userId, timestamp: Date.now() });
     }
 
-    // 5. SUBIR PDF
+    // 7. SUBIR PDF
     if (action === 'uploadPdf' && req.method === 'POST') {
       const { filename, subject, dataBase64 } = req.body;
       if (!filename || !dataBase64) {
@@ -203,7 +245,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, filename, subject, userId });
     }
 
-    // 6. DESCARGAR PDF
+    // 8. DESCARGAR PDF
     if (action === 'getPdf' && req.method === 'GET') {
       const filename = req.query.filename;
       const subject = req.query.subject;
@@ -223,7 +265,7 @@ export default async function handler(req, res) {
       return res.status(200).send(Buffer.from(arrayBuf));
     }
 
-    // 7. ELIMINAR PDF
+    // 9. ELIMINAR PDF
     if (action === 'deletePdf' && (req.method === 'POST' || req.method === 'DELETE')) {
       const filename = req.query.filename || (req.body && req.body.filename);
       const subject = req.query.subject || (req.body && req.body.subject);

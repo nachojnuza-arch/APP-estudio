@@ -381,26 +381,92 @@
         <!-- Modal: Sincronización en la Nube -->
         <div id="login-modal" class="modal-container hidden bg-white rounded-2xl shadow-2xl w-[90%] max-w-sm overflow-hidden">
             <div class="p-6 text-center">
-                <div class="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-3 text-2xl">
+                <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-2 text-xl">
                     <i class="fas fa-cloud-arrow-up"></i>
                 </div>
-                <h2 class="text-xl font-bold text-slate-800 mb-1">Sincronización en la Nube</h2>
-                <p id="drive-modal-desc" class="text-xs text-slate-500 mb-4">
-                    Ingresa tu usuario y clave. Si es la primera vez, <b>se creará tu cuenta automáticamente</b>.
+                <h2 class="text-lg font-bold text-slate-800 mb-1">Sincronización en la Nube</h2>
+                <p class="text-xs text-slate-500 mb-4">
+                    Respalda y accede a tus PDFs y apuntes desde cualquier dispositivo.
                 </p>
-                
-                <div id="auth-form-container" class="space-y-3 text-left mb-4">
-                    <div>
-                        <label class="text-xs font-semibold text-slate-600 mb-1 block">Usuario o Alias:</label>
-                        <input type="text" id="sync-username-input" placeholder="ej. nacho" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+
+                <div id="auth-tabs-container">
+                    <!-- Pestañas Iniciar Sesión / Crear Cuenta -->
+                    <div class="flex bg-slate-100 p-1 rounded-xl mb-4">
+                        <button type="button" id="tab-btn-auth-login" onclick="window.ServerSync.setAuthTab('login')" class="flex-1 py-2 text-xs font-bold rounded-lg bg-white shadow-sm text-indigo-600 transition-all">
+                            Iniciar Sesión
+                        </button>
+                        <button type="button" id="tab-btn-auth-register" onclick="window.ServerSync.setAuthTab('register')" class="flex-1 py-2 text-xs font-bold rounded-lg text-slate-500 hover:text-slate-700 transition-all">
+                            Crear Cuenta
+                        </button>
                     </div>
-                    <div>
-                        <label class="text-xs font-semibold text-slate-600 mb-1 block">PIN o Contraseña:</label>
-                        <input type="password" id="sync-pin-input" placeholder="ej. 1234" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+
+                    <!-- Vista 1: Iniciar Sesión -->
+                    <div id="auth-view-login" class="space-y-3 text-left mb-4">
+                        <div>
+                            <label class="text-xs font-semibold text-slate-600 mb-1 block">Usuario:</label>
+                            <input type="text" id="login-username-input" placeholder="ej. nacho" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-slate-600 mb-1 block">Contraseña:</label>
+                            <input type="password" id="login-pin-input" placeholder="Tu contraseña" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                        </div>
+                        <button type="button" onclick="window.ServerSync.loginFromModal()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm">
+                            <i class="fas fa-sign-in-alt"></i> Ingresar
+                        </button>
+                        <div class="text-center pt-1">
+                            <button type="button" onclick="window.ServerSync.setAuthTab('recover')" class="text-xs text-indigo-600 hover:underline">
+                                ¿Olvidaste tu contraseña?
+                            </button>
+                        </div>
                     </div>
-                    <button type="button" onclick="window.ServerSync.loginFromModal()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm">
-                        <i class="fas fa-link"></i> Conectar y Sincronizar
-                    </button>
+
+                    <!-- Vista 2: Crear Cuenta -->
+                    <div id="auth-view-register" class="hidden space-y-2.5 text-left mb-4">
+                        <div>
+                            <label class="text-xs font-semibold text-slate-600 mb-1 block">Nombre de Usuario:</label>
+                            <input type="text" id="register-username-input" placeholder="ej. nacho" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-slate-600 mb-1 block">Contraseña:</label>
+                            <input type="password" id="register-pin-input" placeholder="Mínimo 3 caracteres" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-slate-600 mb-1 block">Confirmar Contraseña:</label>
+                            <input type="password" id="register-pin-confirm-input" placeholder="Repite tu contraseña" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-slate-600 mb-1 block">Palabra clave de recuperación:</label>
+                            <input type="text" id="register-recovery-input" placeholder="ej. mascota o email (para recuperar)" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                            <span class="text-[10px] text-slate-400">Te permitirá cambiar la clave si la olvidas.</span>
+                        </div>
+                        <button type="button" onclick="window.ServerSync.registerFromModal()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm mt-2">
+                            <i class="fas fa-user-plus"></i> Registrar Cuenta
+                        </button>
+                    </div>
+
+                    <!-- Vista 3: Recuperar Contraseña -->
+                    <div id="auth-view-recover" class="hidden space-y-2.5 text-left mb-4">
+                        <div>
+                            <label class="text-xs font-semibold text-slate-600 mb-1 block">Tu Usuario:</label>
+                            <input type="text" id="recover-username-input" placeholder="Tu usuario registrado" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-slate-600 mb-1 block">Palabra Clave de Recuperación:</label>
+                            <input type="text" id="recover-recovery-input" placeholder="La palabra que pusiste al registrarte" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-slate-600 mb-1 block">Nueva Contraseña:</label>
+                            <input type="password" id="recover-new-pin-input" placeholder="Tu nueva contraseña" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                        </div>
+                        <button type="button" onclick="window.ServerSync.recoverFromModal()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm mt-2">
+                            <i class="fas fa-key"></i> Restablecer Contraseña
+                        </button>
+                        <div class="text-center pt-1">
+                            <button type="button" onclick="window.ServerSync.setAuthTab('login')" class="text-xs text-slate-500 hover:text-slate-700">
+                                ← Volver a Iniciar Sesión
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <div id="auth-connected-container" class="hidden mb-4 p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-left">

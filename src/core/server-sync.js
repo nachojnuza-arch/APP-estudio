@@ -8,6 +8,7 @@ window.ServerSync = {
     _syncTimeout: null,
     _pendingSync: false,
     _checkInterval: null,
+    activeTab: 'login',
 
     getUserId() {
         return localStorage.getItem('app_sync_user') || '';
@@ -22,14 +23,10 @@ window.ServerSync = {
     },
 
     async init() {
-        console.log(`[ServerSync] Inicializando (Usuario actual: ${this.getUserId() || 'Modo Local'})...`);
+        console.log(`[ServerSync] Inicializando (Usuario: ${this.getUserId() || 'Modo Local'})...`);
         
-        // 1. Proteger almacenamiento local contra borrado automático
         this.requestPersistentStorage();
-
-        // 2. Comprobar espacio
         this.checkStorageQuota();
-
         this.updateUI();
         await this.checkServerStatus();
 
@@ -42,67 +39,192 @@ window.ServerSync = {
         }
     },
 
-    openAuthModal() {
+    openAuthModal(tab = 'login') {
         const modal = document.getElementById('login-modal');
         if (!modal) return;
 
-        const formCont = document.getElementById('auth-form-container');
         const connCont = document.getElementById('auth-connected-container');
+        const tabsCont = document.getElementById('auth-tabs-container');
         const connUser = document.getElementById('connected-username');
-        const userInput = document.getElementById('sync-username-input');
-        const pinInput = document.getElementById('sync-pin-input');
 
         if (this.isConnected()) {
-            if (formCont) formCont.classList.add('hidden');
+            if (tabsCont) tabsCont.classList.add('hidden');
             if (connCont) connCont.classList.remove('hidden');
             if (connUser) connUser.textContent = this.getUserId();
         } else {
-            if (formCont) formCont.classList.remove('hidden');
+            if (tabsCont) tabsCont.classList.remove('hidden');
             if (connCont) connCont.classList.add('hidden');
-            if (userInput) userInput.value = '';
-            if (pinInput) pinInput.value = '';
+            this.setAuthTab(tab);
         }
 
         if (typeof openModal === 'function') openModal('login-modal');
     },
 
+    setAuthTab(tab) {
+        this.activeTab = tab;
+        const viewLogin = document.getElementById('auth-view-login');
+        const viewRegister = document.getElementById('auth-view-register');
+        const viewRecover = document.getElementById('auth-view-recover');
+
+        const btnTabLogin = document.getElementById('tab-btn-auth-login');
+        const btnTabRegister = document.getElementById('tab-btn-auth-register');
+
+        if (viewLogin) viewLogin.classList.toggle('hidden', tab !== 'login');
+        if (viewRegister) viewRegister.classList.toggle('hidden', tab !== 'register');
+        if (viewRecover) viewRecover.classList.toggle('hidden', tab !== 'recover');
+
+        if (btnTabLogin && btnTabRegister) {
+            if (tab === 'login') {
+                btnTabLogin.className = 'flex-1 py-2 text-xs font-bold rounded-lg bg-white shadow-sm text-indigo-600';
+                btnTabRegister.className = 'flex-1 py-2 text-xs font-bold rounded-lg text-slate-500 hover:text-slate-700';
+            } else if (tab === 'register') {
+                btnTabLogin.className = 'flex-1 py-2 text-xs font-bold rounded-lg text-slate-500 hover:text-slate-700';
+                btnTabRegister.className = 'flex-1 py-2 text-xs font-bold rounded-lg bg-white shadow-sm text-indigo-600';
+            } else {
+                btnTabLogin.className = 'flex-1 py-2 text-xs font-bold rounded-lg text-slate-500';
+                btnTabRegister.className = 'flex-1 py-2 text-xs font-bold rounded-lg text-slate-500';
+            }
+        }
+    },
+
+    // 1. INICIAR SESIÓN
     async loginFromModal() {
-        const userInput = document.getElementById('sync-username-input');
-        const pinInput = document.getElementById('sync-pin-input');
+        const userInput = document.getElementById('login-username-input');
+        const pinInput = document.getElementById('login-pin-input');
 
         const user = (userInput?.value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
         const pin = (pinInput?.value || '').trim();
 
-        if (!user) {
-            if (typeof showToast === 'function') showToast('Ingresa un nombre de usuario', 'error');
+        if (!user || !pin) {
+            if (typeof showToast === 'function') showToast('Ingresa usuario y contraseña', 'error');
             return;
         }
 
         try {
-            if (typeof showToast === 'function') showToast('Validando conexión...', 'info');
+            if (typeof showToast === 'function') showToast('Iniciando sesión...', 'info');
 
-            const res = await fetch(`/api/sync?action=auth&userId=${encodeURIComponent(user)}&pin=${encodeURIComponent(pin)}`, {
-                headers: {
-                    'X-User-Id': user,
-                    'X-User-Pin': pin
-                }
+            const res = await fetch(`/api/sync?action=login&userId=${encodeURIComponent(user)}&pin=${encodeURIComponent(pin)}`, {
+                headers: { 'X-User-Id': user, 'X-User-Pin': pin }
             });
 
-            if (res.ok) {
+            const data = await res.json();
+            if (res.ok && data.success) {
                 localStorage.setItem('app_sync_user', user);
                 localStorage.setItem('app_sync_pin', pin);
                 if (typeof closeModal === 'function') closeModal('login-modal');
-                if (typeof showToast === 'function') showToast(`¡Conectado como ${user}! Sincronizando...`, 'success');
+                if (typeof showToast === 'function') showToast(`¡Bienvenido ${user}! Sincronizando...`, 'success');
                 this.isServerOnline = true;
                 this.updateUI();
                 await this.pullWorkspaceIfNewer();
                 await this.syncAppData(window.appData);
             } else {
-                const err = await res.json();
-                if (typeof showToast === 'function') showToast(err.error || 'PIN o usuario incorrecto', 'error');
+                if (typeof showToast === 'function') showToast(data.error || 'Usuario o contraseña incorrectos', 'error');
             }
         } catch (e) {
-            if (typeof showToast === 'function') showToast('No se pudo conectar al servidor', 'error');
+            if (typeof showToast === 'function') showToast('Error al conectar con el servidor', 'error');
+        }
+    },
+
+    // 2. CREAR CUENTA
+    async registerFromModal() {
+        const userInput = document.getElementById('register-username-input');
+        const pinInput = document.getElementById('register-pin-input');
+        const pinConfirmInput = document.getElementById('register-pin-confirm-input');
+        const recoveryInput = document.getElementById('register-recovery-input');
+
+        const user = (userInput?.value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+        const pin = (pinInput?.value || '').trim();
+        const pinConfirm = (pinConfirmInput?.value || '').trim();
+        const recoveryKey = (recoveryInput?.value || '').trim();
+
+        if (!user) {
+            if (typeof showToast === 'function') showToast('Elige un nombre de usuario', 'error');
+            return;
+        }
+        if (!pin || pin.length < 3) {
+            if (typeof showToast === 'function') showToast('La contraseña debe tener al menos 3 caracteres', 'error');
+            return;
+        }
+        if (pin !== pinConfirm) {
+            if (typeof showToast === 'function') showToast('Las contraseñas no coinciden', 'error');
+            return;
+        }
+        if (!recoveryKey) {
+            if (typeof showToast === 'function') showToast('Ingresa una palabra secreta de recuperación', 'error');
+            return;
+        }
+
+        try {
+            if (typeof showToast === 'function') showToast('Creando tu cuenta...', 'info');
+
+            const res = await fetch('/api/sync?action=register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: user,
+                    pin: pin,
+                    recoveryKey: recoveryKey
+                })
+            });
+
+            const data = await res.json();
+            if (res.ok && data.success) {
+                localStorage.setItem('app_sync_user', user);
+                localStorage.setItem('app_sync_pin', pin);
+                if (typeof closeModal === 'function') closeModal('login-modal');
+                if (typeof showToast === 'function') showToast(`¡Cuenta "${user}" creada con éxito!`, 'success');
+                this.isServerOnline = true;
+                this.updateUI();
+                await this.syncAppData(window.appData);
+            } else {
+                if (typeof showToast === 'function') showToast(data.error || 'No se pudo crear la cuenta', 'error');
+            }
+        } catch (e) {
+            if (typeof showToast === 'function') showToast('Error al conectar con el servidor', 'error');
+        }
+    },
+
+    // 3. RECUPERAR CONTRASEÑA
+    async recoverFromModal() {
+        const userInput = document.getElementById('recover-username-input');
+        const recoveryInput = document.getElementById('recover-recovery-input');
+        const newPinInput = document.getElementById('recover-new-pin-input');
+
+        const user = (userInput?.value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+        const recoveryKey = (recoveryInput?.value || '').trim();
+        const newPin = (newPinInput?.value || '').trim();
+
+        if (!user || !recoveryKey || !newPin) {
+            if (typeof showToast === 'function') showToast('Completa todos los campos para recuperar', 'error');
+            return;
+        }
+
+        try {
+            if (typeof showToast === 'function') showToast('Restableciendo contraseña...', 'info');
+
+            const res = await fetch('/api/sync?action=recover', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: user,
+                    recoveryKey: recoveryKey,
+                    newPin: newPin
+                })
+            });
+
+            const data = await res.json();
+            if (res.ok && data.success) {
+                if (typeof showToast === 'function') showToast('¡Contraseña restablecida! Ya puedes ingresar.', 'success');
+                this.setAuthTab('login');
+                const logUser = document.getElementById('login-username-input');
+                const logPin = document.getElementById('login-pin-input');
+                if (logUser) logUser.value = user;
+                if (logPin) logPin.value = newPin;
+            } else {
+                if (typeof showToast === 'function') showToast(data.error || 'Datos de recuperación incorrectos', 'error');
+            }
+        } catch (e) {
+            if (typeof showToast === 'function') showToast('Error al conectar con el servidor', 'error');
         }
     },
 
@@ -110,7 +232,7 @@ window.ServerSync = {
         localStorage.removeItem('app_sync_user');
         localStorage.removeItem('app_sync_pin');
         if (typeof closeModal === 'function') closeModal('login-modal');
-        if (typeof showToast === 'function') showToast('Desconectado de la nube. Modo local activo.', 'info');
+        if (typeof showToast === 'function') showToast('Sesión cerrada. Modo local activo.', 'info');
         this.updateUI();
     },
 
@@ -128,7 +250,7 @@ window.ServerSync = {
                 const estimate = await navigator.storage.estimate();
                 const usedMB = ((estimate.usage || 0) / (1024 * 1024)).toFixed(1);
                 const quotaMB = ((estimate.quota || 0) / (1024 * 1024)).toFixed(1);
-                console.log(`[ServerSync] Espacio navegador: ${usedMB} MB usados de ${quotaMB} MB disponibles.`);
+                console.log(`[ServerSync] Espacio: ${usedMB} MB usados de ${quotaMB} MB.`);
             } catch (e) {}
         }
     },
@@ -200,7 +322,6 @@ window.ServerSync = {
     async syncAppData(appData) {
         if (!appData) return;
 
-        // Guardar SIEMPRE primero en IndexedDB y localStorage local
         const rawJson = JSON.stringify(appData);
         try {
             if (window.idb && typeof window.idb.putWorkspace === 'function') {

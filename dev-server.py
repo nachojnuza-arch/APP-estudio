@@ -19,8 +19,8 @@ auth_bytes = f"{NEXTCLOUD_USER}:{NEXTCLOUD_TOKEN}".encode("utf-8")
 AUTH_HEADER = f"Basic {base64.b64encode(auth_bytes).decode('utf-8')}"
 WEBDAV_ROOT = f"{NEXTCLOUD_URL}/remote.php/dav/files/{urllib.parse.quote(NEXTCLOUD_USER)}/{urllib.parse.quote(NEXTCLOUD_DIR)}"
 
-def hash_pin(pin):
-    return hashlib.sha256(str(pin or "").encode('utf-8')).hexdigest()
+def hash_string(s):
+    return hashlib.sha256(str(s or "").strip().lower().encode('utf-8')).hexdigest()
 
 class DevHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
@@ -66,36 +66,17 @@ class DevHandler(http.server.SimpleHTTPRequestHandler):
         except Exception:
             pass
 
-    def check_auth(self, user_id, pin):
+    def get_stored_auth(self, user_id):
         if not user_id:
-            return False, "Usuario no especificado"
+            return None
         user_root = self.get_user_root(user_id)
-        self.ensure_dir(f"{WEBDAV_ROOT}/users")
-        self.ensure_dir(user_root)
-
-        pin_h = hash_pin(pin)
         auth_url = f"{user_root}/auth.json"
         try:
             req = urllib.request.Request(auth_url, headers={"Authorization": AUTH_HEADER}, method="GET")
             with urllib.request.urlopen(req, timeout=4) as resp:
-                stored = json.loads(resp.read().decode('utf-8'))
-                if stored.get("pinHash") and stored.get("pinHash") != pin_h:
-                    return False, "PIN o contraseña incorrecta"
-                return True, "OK"
-        except urllib.error.HTTPError as e:
-            if e.code == 404:
-                # First time registration
-                if pin:
-                    auth_data = json.dumps({"userId": user_id, "pinHash": pin_h}).encode('utf-8')
-                    put_req = urllib.request.Request(auth_url, data=auth_data, headers={"Authorization": AUTH_HEADER, "Content-Type": "application/json"}, method="PUT")
-                    try:
-                        urllib.request.urlopen(put_req, timeout=4)
-                    except Exception:
-                        pass
-                return True, "OK"
-        except Exception as e:
-            pass
-        return True, "OK"
+                return json.loads(resp.read().decode('utf-8'))
+        except Exception:
+            return None
 
     def handle_sync_get(self, parsed):
         qs = urllib.parse.parse_qs(parsed.query)
@@ -116,13 +97,20 @@ class DevHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_json(200, {"online": False, "message": str(e)})
             return
 
-        ok, msg = self.check_auth(user_id, pin)
-        if not ok:
-            self.send_json(401, {"error": msg})
+        if action == "login" or action == "auth":
+            stored = self.get_stored_auth(user_id)
+            if not stored:
+                self.send_json(404, {"error": "El usuario no existe. Por favor crea una cuenta primero."})
+                return
+            if stored.get("pinHash") and stored.get("pinHash") != hash_string(pin):
+                self.send_json(401, {"error": "Contraseña o PIN incorrecto."})
+                return
+            self.send_json(200, {"success": True, "userId": user_id})
             return
 
-        if action == "auth":
-            self.send_json(200, {"success": True, "userId": user_id})
+        stored = self.get_stored_auth(user_id)
+        if not stored or (stored.get("pinHash") and stored.get("pinHash") != hash_string(pin)):
+            self.send_json(401, {"error": "No autorizado. Inicia sesión con tus credenciales."})
             return
 
         if action == "getWorkspace":
@@ -180,16 +168,71 @@ class DevHandler(http.server.SimpleHTTPRequestHandler):
         pin = self.headers.get("X-User-Pin") or body.get("pin") or qs.get("pin", [""])[0]
         user_root = self.get_user_root(user_id)
 
-        ok, msg = self.check_auth(user_id, pin)
-        if not ok:
-            self.send_json(401, {"error": msg})
-            return
-
         self.ensure_dir(f"{WEBDAV_ROOT}/users")
         self.ensure_dir(user_root)
 
-        if action == "auth":
+        if action == "register":
+            if not user_id or not pin:
+                self.send_json(400, {"error": "Debes ingresar un nombre de usuario y una contraseña."})
+                return
+            stored = self.get_stored_auth(user_id)
+            if stored:
+                self.send_json(400, {"error": "Este usuario ya existe. Por favor inicia sesión."})
+                return
+            recovery_key = body.get("recoveryKey", "")
+            auth_data = json.dumps({
+                "userId": user_id,
+                "pinHash": hash_string(pin),
+                "recoveryHash": hash_string(recovery_key) if recovery_key else "",
+                "createdAt": 1787240000
+            }, indent=2).encode('utf-8')
+            auth_url = f"{user_root}/auth.json"
+            put_req = urllib.request.Request(auth_url, data=auth_data, headers={"Authorization": AUTH_HEADER, "Content-Type": "application/json"}, method="PUT")
+            try:
+                urllib.request.urlopen(put_req, timeout=4)
+                self.send_json(200, {"success": True, "userId": user_id, "message": "Usuario creado exitosamente."})
+            except Exception as e:
+                self.send_json(500, {"error": str(e)})
+            return
+
+        if action == "recover":
+            recovery_key = body.get("recoveryKey", "")
+            new_pin = body.get("newPin", "")
+            if not user_id or not recovery_key or not new_pin:
+                self.send_json(400, {"error": "Faltan datos para restablecer la contraseña."})
+                return
+            stored = self.get_stored_auth(user_id)
+            if not stored:
+                self.send_json(404, {"error": "El usuario no existe."})
+                return
+            if not stored.get("recoveryHash") or stored.get("recoveryHash") != hash_string(recovery_key):
+                self.send_json(401, {"error": "La palabra clave o respuesta de recuperación es incorrecta."})
+                return
+            stored["pinHash"] = hash_string(new_pin)
+            auth_data = json.dumps(stored, indent=2).encode('utf-8')
+            auth_url = f"{user_root}/auth.json"
+            put_req = urllib.request.Request(auth_url, data=auth_data, headers={"Authorization": AUTH_HEADER, "Content-Type": "application/json"}, method="PUT")
+            try:
+                urllib.request.urlopen(put_req, timeout=4)
+                self.send_json(200, {"success": True, "message": "Contraseña restablecida con éxito."})
+            except Exception as e:
+                self.send_json(500, {"error": str(e)})
+            return
+
+        if action == "login" or action == "auth":
+            stored = self.get_stored_auth(user_id)
+            if not stored:
+                self.send_json(404, {"error": "El usuario no existe. Por favor crea una cuenta primero."})
+                return
+            if stored.get("pinHash") and stored.get("pinHash") != hash_string(pin):
+                self.send_json(401, {"error": "Contraseña o PIN incorrecto."})
+                return
             self.send_json(200, {"success": True, "userId": user_id})
+            return
+
+        stored = self.get_stored_auth(user_id)
+        if not stored or (stored.get("pinHash") and stored.get("pinHash") != hash_string(pin)):
+            self.send_json(401, {"error": "No autorizado. Inicia sesión con tus credenciales."})
             return
 
         if action == "putWorkspace":
