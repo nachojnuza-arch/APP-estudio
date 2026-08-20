@@ -30,13 +30,23 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
+  let body = req.body;
+  if (typeof body === 'string') {
+    try {
+      body = JSON.parse(body);
+    } catch (e) {
+      body = {};
+    }
+  }
+  body = body || {};
+
   const baseUrl = (process.env.NEXTCLOUD_URL || 'http://127.0.0.1:8080').replace(/\/+$/, '');
   const ncUser = process.env.NEXTCLOUD_USER || 'nacho';
   const token = process.env.NEXTCLOUD_TOKEN || 'j0qQfIZe4rar6PBLlj7YjQbZfuUFV3giK35Jg6lg0dVytl627iLKlMtrX7k6cLjLNJmfAdSt';
   const baseDir = process.env.NEXTCLOUD_DIR || 'APP-Estudio';
 
-  const rawUserId = req.headers['x-user-id'] || req.query.userId || (req.body && req.body.userId) || '';
-  const rawPin = req.headers['x-user-pin'] || req.query.pin || (req.body && req.body.pin) || '';
+  const rawUserId = req.headers['x-user-id'] || req.query.userId || body.userId || '';
+  const rawPin = req.headers['x-user-pin'] || req.query.pin || body.pin || '';
   
   const userId = String(rawUserId).replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase().trim();
   const userPinHash = rawPin ? hashString(rawPin) : '';
@@ -45,7 +55,7 @@ export default async function handler(req, res) {
   const webdavRoot = `${baseUrl}/remote.php/dav/files/${encodeURIComponent(ncUser)}/${encodeURIComponent(baseDir)}`;
   const userRoot = userId ? `${webdavRoot}/users/${encodeURIComponent(userId)}` : '';
 
-  const action = req.query.action || (req.body && req.body.action);
+  const action = req.query.action || body.action;
 
   async function davFetch(url, options = {}, timeoutMs = 8000) {
     const controller = new AbortController();
@@ -63,7 +73,7 @@ export default async function handler(req, res) {
       return resp;
     } catch (err) {
       clearTimeout(timer);
-      throw err;
+      throw new Error(`Error conectando a Nextcloud (${baseUrl}): ${err.message}`);
     }
   }
 
@@ -74,7 +84,7 @@ export default async function handler(req, res) {
         await davFetch(folderUrl, { method: 'MKCOL' }, 3000);
       }
     } catch (e) {
-      // Ignorar si ya existe
+      // Ignorar si ya existe o no se puede crear
     }
   }
 
@@ -110,7 +120,7 @@ export default async function handler(req, res) {
         }
         return res.status(200).json({ online: false, message: 'Servidor no responde' });
       } catch (err) {
-        return res.status(200).json({ online: false, message: 'Servidor apagado' });
+        return res.status(200).json({ online: false, message: err.message });
       }
     }
 
@@ -142,8 +152,8 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Este usuario ya está registrado. Por favor inicia sesión.' });
       }
 
-      const securityQuestion = req.body.securityQuestion || req.query.securityQuestion || 'mascota';
-      const securityAnswer = req.body.securityAnswer || req.query.securityAnswer || '';
+      const securityQuestion = body.securityQuestion || req.query.securityQuestion || 'mascota';
+      const securityAnswer = body.securityAnswer || req.query.securityAnswer || '';
 
       if (!securityAnswer) {
         return res.status(400).json({ error: 'Debes responder a la pregunta de seguridad.' });
@@ -168,8 +178,8 @@ export default async function handler(req, res) {
 
     // 4. RECUPERAR CONTRASEÑA
     if (action === 'recover' && req.method === 'POST') {
-      const securityAnswer = req.body.securityAnswer || req.query.securityAnswer || '';
-      const newPin = req.body.newPin || req.query.newPin || '';
+      const securityAnswer = body.securityAnswer || req.query.securityAnswer || '';
+      const newPin = body.newPin || req.query.newPin || '';
 
       if (!userId || !securityAnswer || !newPin) {
         return res.status(400).json({ error: 'Faltan datos para la recuperación.' });
@@ -233,7 +243,7 @@ export default async function handler(req, res) {
     // 7. GUARDAR WORKSPACE
     if (action === 'putWorkspace' && req.method === 'POST') {
       await ensureUserHierarchy();
-      const payload = req.body.data || req.body;
+      const payload = body.data || body;
       const fileUrl = `${userRoot}/workspace_data.json`;
       const jsonContent = typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2);
 
@@ -251,7 +261,7 @@ export default async function handler(req, res) {
 
     // 8. SUBIR PDF
     if (action === 'uploadPdf' && req.method === 'POST') {
-      const { filename, subject, dataBase64 } = req.body;
+      const { filename, subject, dataBase64 } = body;
       if (!filename || !dataBase64) {
         return res.status(400).json({ error: 'Faltan datos' });
       }
@@ -297,8 +307,8 @@ export default async function handler(req, res) {
 
     // 10. ELIMINAR PDF
     if (action === 'deletePdf' && (req.method === 'POST' || req.method === 'DELETE')) {
-      const filename = req.query.filename || (req.body && req.body.filename);
-      const subject = req.query.subject || (req.body && req.body.subject);
+      const filename = req.query.filename || body.filename;
+      const subject = req.query.subject || body.subject;
       if (!filename) return res.status(400).json({ error: 'Falta filename' });
 
       const fileUrl = subject
