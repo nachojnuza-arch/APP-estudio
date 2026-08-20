@@ -22,7 +22,7 @@ class DevHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-User-Id')
         super().end_headers()
 
     def do_OPTIONS(self):
@@ -44,16 +44,36 @@ class DevHandler(http.server.SimpleHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
+    def get_user_root(self, user_id):
+        clean_user = "".join(c for c in user_id if c.isalnum() or c in ('_', '-')).lower() or 'default'
+        return f"{WEBDAV_ROOT}/users/{urllib.parse.quote(clean_user)}"
+
+    def ensure_dir(self, url):
+        try:
+            req = urllib.request.Request(url, headers={"Authorization": AUTH_HEADER}, method="PROPFIND")
+            urllib.request.urlopen(req, timeout=3)
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                try:
+                    mk = urllib.request.Request(url, headers={"Authorization": AUTH_HEADER}, method="MKCOL")
+                    urllib.request.urlopen(mk, timeout=3)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
     def handle_sync_get(self, parsed):
         qs = urllib.parse.parse_qs(parsed.query)
         action = qs.get("action", [""])[0]
+        user_id = self.headers.get("X-User-Id") or qs.get("userId", ["nacho"])[0]
+        user_root = self.get_user_root(user_id)
 
         if action == "status":
             try:
                 req = urllib.request.Request(WEBDAV_ROOT, headers={"Authorization": AUTH_HEADER}, method="PROPFIND")
                 with urllib.request.urlopen(req, timeout=3) as resp:
                     if 200 <= resp.status < 300:
-                        self.send_json(200, {"online": True, "server": "Nextcloud (Local Dev)"})
+                        self.send_json(200, {"online": True, "server": "Nextcloud (Local Dev)", "userId": user_id})
                         return
                 self.send_json(200, {"online": False, "message": "Respuesta no exitosa"})
             except Exception as e:
@@ -61,15 +81,15 @@ class DevHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         if action == "getWorkspace":
-            url = f"{WEBDAV_ROOT}/workspace_data.json"
+            url = f"{user_root}/workspace_data.json"
             try:
                 req = urllib.request.Request(url, headers={"Authorization": AUTH_HEADER}, method="GET")
                 with urllib.request.urlopen(req, timeout=5) as resp:
                     data = json.loads(resp.read().decode('utf-8'))
-                    self.send_json(200, {"exists": True, "data": data})
+                    self.send_json(200, {"exists": True, "data": data, "userId": user_id})
             except urllib.error.HTTPError as e:
                 if e.code == 404:
-                    self.send_json(200, {"exists": False, "data": None})
+                    self.send_json(200, {"exists": False, "data": None, "userId": user_id})
                 else:
                     self.send_json(e.code, {"error": str(e)})
             except Exception as e:
@@ -82,7 +102,7 @@ class DevHandler(http.server.SimpleHTTPRequestHandler):
             if not filename:
                 self.send_json(400, {"error": "Falta filename"})
                 return
-            url = f"{WEBDAV_ROOT}/{urllib.parse.quote(subject)}/{urllib.parse.quote(filename)}" if subject else f"{WEBDAV_ROOT}/{urllib.parse.quote(filename)}"
+            url = f"{user_root}/{urllib.parse.quote(subject)}/{urllib.parse.quote(filename)}" if subject else f"{user_root}/{urllib.parse.quote(filename)}"
             try:
                 req = urllib.request.Request(url, headers={"Authorization": AUTH_HEADER}, method="GET")
                 with urllib.request.urlopen(req, timeout=10) as resp:
@@ -111,15 +131,21 @@ class DevHandler(http.server.SimpleHTTPRequestHandler):
 
         qs = urllib.parse.parse_qs(parsed.query)
         action = qs.get("action", [""])[0] or body.get("action", "")
+        user_id = self.headers.get("X-User-Id") or body.get("userId") or qs.get("userId", ["nacho"])[0]
+        user_root = self.get_user_root(user_id)
+
+        # Ensure base directories exist
+        self.ensure_dir(f"{WEBDAV_ROOT}/users")
+        self.ensure_dir(user_root)
 
         if action == "putWorkspace":
             payload = body.get("data", body)
             json_bytes = json.dumps(payload, indent=2).encode('utf-8')
-            url = f"{WEBDAV_ROOT}/workspace_data.json"
+            url = f"{user_root}/workspace_data.json"
             try:
                 req = urllib.request.Request(url, data=json_bytes, headers={"Authorization": AUTH_HEADER, "Content-Type": "application/json"}, method="PUT")
                 with urllib.request.urlopen(req, timeout=8) as resp:
-                    self.send_json(200, {"success": True, "timestamp": int(os.path.getmtime("/tmp") if os.path.exists("/tmp") else 0)})
+                    self.send_json(200, {"success": True, "userId": user_id, "timestamp": int(os.path.getmtime("/tmp") if os.path.exists("/tmp") else 0)})
             except Exception as e:
                 self.send_json(500, {"error": str(e)})
             return
@@ -132,28 +158,35 @@ class DevHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_json(400, {"error": "Faltan datos de PDF"})
                 return
             
-            # Ensure folder exists
             if subject:
-                folder_url = f"{WEBDAV_ROOT}/{urllib.parse.quote(subject)}"
-                try:
-                    chk_req = urllib.request.Request(folder_url, headers={"Authorization": AUTH_HEADER}, method="PROPFIND")
-                    urllib.request.urlopen(chk_req, timeout=3)
-                except urllib.error.HTTPError as e:
-                    if e.code == 404:
-                        try:
-                            mk_req = urllib.request.Request(folder_url, headers={"Authorization": AUTH_HEADER}, method="MKCOL")
-                            urllib.request.urlopen(mk_req, timeout=3)
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
+                self.ensure_dir(f"{user_root}/{urllib.parse.quote(subject)}")
 
             file_bytes = base64.b64decode(data_b64)
-            url = f"{WEBDAV_ROOT}/{urllib.parse.quote(subject)}/{urllib.parse.quote(filename)}" if subject else f"{WEBDAV_ROOT}/{urllib.parse.quote(filename)}"
+            url = f"{user_root}/{urllib.parse.quote(subject)}/{urllib.parse.quote(filename)}" if subject else f"{user_root}/{urllib.parse.quote(filename)}"
             try:
                 req = urllib.request.Request(url, data=file_bytes, headers={"Authorization": AUTH_HEADER, "Content-Type": "application/pdf"}, method="PUT")
                 with urllib.request.urlopen(req, timeout=15) as resp:
-                    self.send_json(200, {"success": True, "filename": filename, "subject": subject})
+                    self.send_json(200, {"success": True, "filename": filename, "subject": subject, "userId": user_id})
+            except Exception as e:
+                self.send_json(500, {"error": str(e)})
+            return
+
+        if action == "deletePdf":
+            filename = body.get("filename") or qs.get("filename", [""])[0]
+            subject = body.get("subject") or qs.get("subject", ["General"])[0]
+            if not filename:
+                self.send_json(400, {"error": "Falta filename"})
+                return
+            url = f"{user_root}/{urllib.parse.quote(subject)}/{urllib.parse.quote(filename)}" if subject else f"{user_root}/{urllib.parse.quote(filename)}"
+            try:
+                req = urllib.request.Request(url, headers={"Authorization": AUTH_HEADER}, method="DELETE")
+                with urllib.request.urlopen(req, timeout=8) as resp:
+                    self.send_json(200, {"success": True, "message": "Eliminado"})
+            except urllib.error.HTTPError as e:
+                if e.code == 404:
+                    self.send_json(200, {"success": True, "message": "Ya no existía"})
+                else:
+                    self.send_json(e.code, {"error": str(e)})
             except Exception as e:
                 self.send_json(500, {"error": str(e)})
             return

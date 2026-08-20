@@ -187,6 +187,11 @@
                     <button type="button" onclick="changeZoom(-0.2)" title="Alejar" class="w-8 h-8 rounded-lg hover:bg-slate-100 hidden sm:flex items-center justify-center text-slate-600"><i class="fas fa-minus"></i></button>
                     <button type="button" onclick="changeZoom(0.2)" title="Acercar" class="w-8 h-8 rounded-lg hover:bg-slate-100 hidden sm:flex items-center justify-center text-slate-600"><i class="fas fa-plus"></i></button>
                     <span id="zoom-info" class="hidden"></span>
+
+                    <div class="w-px h-6 bg-slate-200"></div>
+
+                    <button type="button" onclick="rotatePdf(-90)" title="Girar 90° izquierda (Shift+R)" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-600 hover:text-indigo-600 transition-colors"><i class="fas fa-undo"></i></button>
+                    <button type="button" onclick="rotatePdf(90)" title="Girar 90° derecha (R)" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-600 hover:text-indigo-600 transition-colors"><i class="fas fa-redo"></i></button>
                 </div>
             </div>
 

@@ -126,6 +126,7 @@ async function openFile(subId, fileId) {
 
     if (file.type === 'pdf') {
         videoCont.classList.add('hidden');
+        currentState.rotation = 0;
         
         let blob = await idb.get(fileId);
         if (!blob && file.driveId && window.GoogleDriveSync && window.GoogleDriveSync.isLoggedIn) {
@@ -157,7 +158,9 @@ async function renderPage() {
     try {
         const page = await currentState.pdfDoc.getPage(currentState.pageNum);
         const canvas = document.getElementById('pdf-canvas');
-        const viewport = page.getViewport({ scale: currentState.zoom });
+        const pageRotate = page.rotate || 0;
+        const totalRotation = (pageRotate + (currentState.rotation || 0)) % 360;
+        const viewport = page.getViewport({ scale: currentState.zoom, rotation: totalRotation });
         
         const container = document.getElementById('pdf-container');
         container.style.width = viewport.width + 'px';
@@ -203,9 +206,23 @@ function goToPage(num) {
 
 function changeZoom(delta) { currentState.zoom = Math.max(0.5, Math.min(3.0, currentState.zoom + delta)); renderPage(); }
 
+function rotatePdf(delta = 90) {
+    if (!currentState.pdfDoc) return;
+    if (typeof currentState.rotation !== 'number') currentState.rotation = 0;
+    currentState.rotation = (currentState.rotation + delta) % 360;
+    if (currentState.rotation < 0) currentState.rotation += 360;
+    renderPage();
+}
+
 document.addEventListener('keydown', (e) => {
     if (e.ctrlKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); if (currentState.pdfDoc) changePage(e.key === 'ArrowRight' ? 1 : -1); }
     if (e.ctrlKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); if (currentState.pdfDoc) changeZoom(e.key === 'ArrowUp' ? 0.1 : -0.1); }
+    if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey && !e.altKey && !e.metaKey && !['INPUT', 'TEXTAREA'].includes(e.target.tagName) && !e.target.isContentEditable) {
+        if (currentState.pdfDoc) {
+            e.preventDefault();
+            rotatePdf(e.shiftKey ? -90 : 90);
+        }
+    }
 });
 
 // ==========================================

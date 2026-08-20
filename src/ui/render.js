@@ -151,9 +151,14 @@ async function confirmAddFile() {
 async function removeFile(e, subId, fileId) {
     e.stopPropagation();
     if (confirm('¿Eliminar este archivo? Los apuntes de la materia se conservan.')) {
-        await idb.delete(fileId);
         const sub = appData.subjects.find(s => s.id === subId);
-        sub.files = sub.files.filter(f => f.id !== fileId);
+        const fileObj = sub?.files?.find(f => f.id === fileId);
+        if (fileObj && window.ServerSync && typeof window.ServerSync.deletePdf === 'function') {
+            window.ServerSync.deletePdf(sub, fileObj.name + '.pdf');
+        }
+
+        await idb.delete(fileId);
+        if (sub) sub.files = sub.files.filter(f => f.id !== fileId);
 
         if (aiSourceFileIds.has(fileId)) aiSourceFileIds.delete(fileId);
 
