@@ -128,10 +128,10 @@ window.ServerSync = {
                 if (typeof renderSubjects === 'function') renderSubjects();
 
                 if (typeof closeModal === 'function') closeModal('login-modal');
-                if (typeof showToast === 'function') showToast(`¡Bienvenido ${user}! Cargando tu espacio...`, 'success');
+                if (typeof showToast === 'function') showToast(`¡Bienvenido ${user}! Cargando tus apuntes...`, 'success');
                 this.isServerOnline = true;
                 this.updateUI();
-                await this.pullWorkspaceIfNewer();
+                await this.pullWorkspaceIfNewer(true);
             } else {
                 if (typeof showToast === 'function') showToast(data.error || 'Usuario o contraseña incorrectos', 'error');
             }
@@ -454,7 +454,7 @@ window.ServerSync = {
     },
 
     // 2. DESCARGAR WORKSPACE
-    async pullWorkspaceIfNewer() {
+    async pullWorkspaceIfNewer(force = false) {
         if (!this.isConnected()) return;
 
         try {
@@ -468,13 +468,15 @@ window.ServerSync = {
                 const hasLocalContent = window.appData && Array.isArray(window.appData.subjects) && window.appData.subjects.length > 0;
 
                 if (result.exists && hasServerContent) {
-                    // Si el servidor tiene datos y localmente está vacío, restaurar de la nube
-                    if (!hasLocalContent) {
+                    // Si force es true o localmente está vacío, restaurar de la nube y re-renderizar todo
+                    if (force || !hasLocalContent) {
                         console.log(`[ServerSync] Restaurando datos del usuario ${this.getUserId()} desde el servidor...`);
                         if (typeof applyParsedAppData === 'function') {
-                            applyParsedAppData(serverData);
-                            if (typeof renderAll === 'function') renderAll();
+                            applyParsedAppData(serverData, true);
                         }
+                        if (typeof renderSubjects === 'function') renderSubjects();
+                        if (typeof renderManageSubjects === 'function') renderManageSubjects();
+                        if (typeof renderAiSources === 'function') renderAiSources();
                     }
                 } else if (!hasServerContent && hasLocalContent) {
                     // Si la cuenta es nueva pero el usuario ya tenía apuntes/materias creadas en su pantalla, subirlas de inmediato a la nube
