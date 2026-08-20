@@ -57,7 +57,7 @@ export default async function handler(req, res) {
 
   const action = req.query.action || body.action;
 
-  async function davFetch(url, options = {}, timeoutMs = 8000) {
+  async function davFetch(url, options = {}, timeoutMs = 12000) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -79,12 +79,12 @@ export default async function handler(req, res) {
 
   async function ensureFolder(folderUrl) {
     try {
-      const check = await davFetch(folderUrl, { method: 'PROPFIND' }, 3000);
+      const check = await davFetch(folderUrl, { method: 'PROPFIND' }, 4000);
       if (check.status === 404) {
-        await davFetch(folderUrl, { method: 'MKCOL' }, 3000);
+        await davFetch(folderUrl, { method: 'MKCOL' }, 4000);
       }
     } catch (e) {
-      // Ignorar si ya existe o no se puede crear
+      // Ignorar si ya existe
     }
   }
 
@@ -114,7 +114,7 @@ export default async function handler(req, res) {
     // 1. ESTADO DEL SERVIDOR
     if (action === 'status') {
       try {
-        const resp = await davFetch(webdavRoot, { method: 'PROPFIND' }, 4000);
+        const resp = await davFetch(webdavRoot, { method: 'PROPFIND' }, 5000);
         if (resp.status >= 200 && resp.status < 300) {
           return res.status(200).json({ online: true, server: 'Nextcloud' });
         }
@@ -220,13 +220,24 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, userId });
     }
 
-    // Para acciones de datos, validar credenciales
+    // Validar credenciales del usuario para acciones de datos
     const storedAuth = await getStoredAuth();
     if (!storedAuth || (storedAuth.pinHash && storedAuth.pinHash !== userPinHash)) {
       return res.status(401).json({ error: 'No autorizado. Inicia sesión con tus credenciales.' });
     }
 
-    // 6. OBTENER WORKSPACE
+    // 6. CONFIGURACIÓN DE SUBIDA DIRECTA (Para archivos de cualquier tamaño sin límites de Vercel)
+    if (action === 'getUploadConfig') {
+      await ensureUserHierarchy();
+      return res.status(200).json({
+        success: true,
+        webdavRoot,
+        authHeader,
+        userId
+      });
+    }
+
+    // 7. OBTENER WORKSPACE
     if (action === 'getWorkspace') {
       const fileUrl = `${userRoot}/workspace_data.json`;
       const resp = await davFetch(fileUrl, { method: 'GET' });
@@ -240,7 +251,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ exists: true, data, userId });
     }
 
-    // 7. GUARDAR WORKSPACE
+    // 8. GUARDAR WORKSPACE
     if (action === 'putWorkspace' && req.method === 'POST') {
       await ensureUserHierarchy();
       const payload = body.data || body;
@@ -259,53 +270,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, userId, timestamp: Date.now() });
     }
 
-    // 8. SUBIR PDF
-    if (action === 'uploadPdf' && req.method === 'POST') {
-      const { filename, subject, dataBase64 } = body;
-      if (!filename || !dataBase64) {
-        return res.status(400).json({ error: 'Faltan datos' });
-      }
-
-      await ensureUserHierarchy(subject);
-
-      const fileUrl = subject
-        ? `${userRoot}/${encodeURIComponent(subject)}/${encodeURIComponent(filename)}`
-        : `${userRoot}/${encodeURIComponent(filename)}`;
-
-      const buffer = Buffer.from(dataBase64, 'base64');
-      const resp = await davFetch(fileUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/pdf' },
-        body: buffer,
-      });
-
-      if (!resp.ok && resp.status !== 201 && resp.status !== 204) {
-        return res.status(resp.status).json({ error: `Error subiendo PDF: ${resp.statusText}` });
-      }
-      return res.status(200).json({ success: true, filename, subject, userId });
-    }
-
-    // 9. DESCARGAR PDF
-    if (action === 'getPdf' && req.method === 'GET') {
-      const filename = req.query.filename;
-      const subject = req.query.subject;
-      if (!filename) return res.status(400).json({ error: 'Falta filename' });
-
-      const fileUrl = subject
-        ? `${userRoot}/${encodeURIComponent(subject)}/${encodeURIComponent(filename)}`
-        : `${userRoot}/${encodeURIComponent(filename)}`;
-
-      const resp = await davFetch(fileUrl, { method: 'GET' });
-      if (resp.status === 404) return res.status(404).json({ error: 'PDF no encontrado' });
-      if (!resp.ok) return res.status(resp.status).json({ error: resp.statusText });
-
-      const arrayBuf = await resp.arrayBuffer();
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(filename)}"`);
-      return res.status(200).send(Buffer.from(arrayBuf));
-    }
-
-    // 10. ELIMINAR PDF
+    // 9. ELIMINAR PDF
     if (action === 'deletePdf' && (req.method === 'POST' || req.method === 'DELETE')) {
       const filename = req.query.filename || body.filename;
       const subject = req.query.subject || body.subject;

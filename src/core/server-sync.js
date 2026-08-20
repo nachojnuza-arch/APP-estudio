@@ -8,6 +8,7 @@ window.ServerSync = {
     _syncTimeout: null,
     _pendingSync: false,
     _checkInterval: null,
+    _uploadConfig: null,
     activeTab: 'login',
 
     QUESTION_LABELS: {
@@ -120,6 +121,7 @@ window.ServerSync = {
             if (res.ok && data.success) {
                 localStorage.setItem('app_sync_user', user);
                 localStorage.setItem('app_sync_pin', pin);
+                this._uploadConfig = null;
                 if (typeof closeModal === 'function') closeModal('login-modal');
                 if (typeof showToast === 'function') showToast(`¡Bienvenido ${user}! Sincronizando...`, 'success');
                 this.isServerOnline = true;
@@ -183,6 +185,7 @@ window.ServerSync = {
             if (res.ok && data.success) {
                 localStorage.setItem('app_sync_user', user);
                 localStorage.setItem('app_sync_pin', pin);
+                this._uploadConfig = null;
                 if (typeof closeModal === 'function') closeModal('login-modal');
                 if (typeof showToast === 'function') showToast(`¡Cuenta "${user}" creada con éxito!`, 'success');
                 this.isServerOnline = true;
@@ -272,6 +275,7 @@ window.ServerSync = {
     logout() {
         localStorage.removeItem('app_sync_user');
         localStorage.removeItem('app_sync_pin');
+        this._uploadConfig = null;
         if (typeof closeModal === 'function') closeModal('login-modal');
         if (typeof showToast === 'function') showToast('Sesión cerrada. Modo local activo.', 'info');
         this.updateUI();
@@ -436,7 +440,21 @@ window.ServerSync = {
         }
     },
 
-    // 3. SUBIR PDF
+    async getUploadConfig() {
+        if (this._uploadConfig) return this._uploadConfig;
+        try {
+            const res = await fetch(`/api/sync?action=getUploadConfig&userId=${encodeURIComponent(this.getUserId())}&pin=${encodeURIComponent(this.getUserPin())}`, {
+                headers: this.getHeaders()
+            });
+            if (res.ok) {
+                this._uploadConfig = await res.json();
+                return this._uploadConfig;
+            }
+        } catch (e) {}
+        return null;
+    },
+
+    // 3. SUBIR PDF (Directo a WebDAV para soportar archivos de cualquier tamaño sin límites)
     async uploadPdf(fileBlob, fileName, subject) {
         if (!fileBlob || !fileName) return null;
 
@@ -447,57 +465,46 @@ window.ServerSync = {
             return null;
         }
 
-        // Límite de 4.2MB para subida serverless a la nube (archivos mayores quedan seguros en IndexedDB)
         const sizeMB = (fileBlob.size / (1024 * 1024)).toFixed(1);
-        if (fileBlob.size > 4.2 * 1024 * 1024) {
-            console.log(`[ServerSync] PDF "${fileName}" (${sizeMB}MB) conservado localmente en IndexedDB.`);
-            if (typeof showToast === 'function') {
-                showToast(`PDF de ${sizeMB}MB guardado localmente en tu memoria`, 'info');
-            }
-            return fileName;
-        }
 
         try {
             this.isSyncing = true;
             this.updateUI();
 
-            const base64Data = await new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    const base64 = reader.result.split(',')[1];
-                    resolve(base64);
-                };
-                reader.onerror = reject;
-                reader.readAsDataURL(fileBlob);
-            });
+            const config = await this.getUploadConfig();
+            if (config && config.webdavRoot && config.authHeader) {
+                const userFolder = `${config.webdavRoot}/users/${encodeURIComponent(this.getUserId())}`;
+                const subjectFolder = `${userFolder}/${encodeURIComponent(subName)}`;
 
-            const res = await fetch('/api/sync?action=uploadPdf', {
-                method: 'POST',
-                headers: this.getHeaders(),
-                body: JSON.stringify({
-                    filename: fileName,
-                    subject: subName,
-                    userId: this.getUserId(),
-                    pin: this.getUserPin(),
-                    dataBase64: base64Data
-                })
-            });
+                // Asegurar carpetas en WebDAV
+                try {
+                    await fetch(userFolder, { method: 'MKCOL', headers: { 'Authorization': config.authHeader } });
+                } catch(e) {}
+                try {
+                    await fetch(subjectFolder, { method: 'MKCOL', headers: { 'Authorization': config.authHeader } });
+                } catch(e) {}
 
-            if (res.ok) {
-                console.log(`[ServerSync] PDF "${fileName}" respaldado en el servidor.`);
-                if (typeof showToast === 'function') {
-                    showToast(`PDF respaldado en tu nube (${subName})`, 'success');
+                // Subida directa de flujo binario (soporta 10MB, 50MB, 100MB, 500MB+)
+                const fileUrl = `${subjectFolder}/${encodeURIComponent(fileName)}`;
+                const uploadRes = await fetch(fileUrl, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': config.authHeader,
+                        'Content-Type': 'application/pdf'
+                    },
+                    body: fileBlob
+                });
+
+                if (uploadRes.ok || uploadRes.status === 201 || uploadRes.status === 204) {
+                    console.log(`[ServerSync] PDF "${fileName}" (${sizeMB}MB) respaldado en la nube.`);
+                    if (typeof showToast === 'function') {
+                        showToast(`PDF de ${sizeMB}MB respaldado en tu nube (${subName})`, 'success');
+                    }
+                    return fileName;
                 }
-                return fileName;
-            } else if (res.status === 413) {
-                console.log(`[ServerSync] PDF "${fileName}" (${sizeMB}MB) guardado localmente.`);
-                if (typeof showToast === 'function') {
-                    showToast(`PDF de ${sizeMB}MB guardado en el navegador`, 'info');
-                }
-                return fileName;
             }
         } catch (err) {
-            console.warn('[ServerSync] Error subiendo PDF:', err);
+            console.warn('[ServerSync] Error subiendo PDF a la nube:', err);
         } finally {
             this.isSyncing = false;
             this.updateUI();
@@ -505,16 +512,21 @@ window.ServerSync = {
         return null;
     },
 
-    // 4. DESCARGAR PDF
+    // 4. DESCARGAR PDF (Directo desde WebDAV)
     async downloadPdf(subject, fileName) {
         if (!fileName || !this.isConnected()) return null;
         const subName = subject ? (typeof subject === 'string' ? subject : subject.name) : 'General';
 
         try {
-            const url = `/api/sync?action=getPdf&userId=${encodeURIComponent(this.getUserId())}&pin=${encodeURIComponent(this.getUserPin())}&subject=${encodeURIComponent(subName)}&filename=${encodeURIComponent(fileName)}`;
-            const res = await fetch(url, { headers: this.getHeaders() });
-            if (res.ok) {
-                return await res.blob();
+            const config = await this.getUploadConfig();
+            if (config && config.webdavRoot && config.authHeader) {
+                const fileUrl = `${config.webdavRoot}/users/${encodeURIComponent(this.getUserId())}/${encodeURIComponent(subName)}/${encodeURIComponent(fileName)}`;
+                const res = await fetch(fileUrl, {
+                    headers: { 'Authorization': config.authHeader }
+                });
+                if (res.ok) {
+                    return await res.blob();
+                }
             }
         } catch (err) {
             console.warn(`[ServerSync] Error descargando PDF "${fileName}":`, err);
