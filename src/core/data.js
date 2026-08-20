@@ -49,8 +49,9 @@ function migrateNotesToPerSubject() {
     });
 }
 
-function applyParsedAppData(parsed) {
-    appData = parsed;
+function applyParsedAppData(parsed, persistImmediate = true) {
+    appData = parsed || { subjects: [], notes: {} };
+    window.appData = appData;
     if (!appData.subjects) appData.subjects = [];
     appData.subjects.forEach(sub => {
         if (!sub.files) sub.files = [];
@@ -59,9 +60,11 @@ function applyParsedAppData(parsed) {
     migrateNotesToPerSubject();
     
     // PERSISTIR ESTADO MIGRADO INMEDIATAMENTE PARA EVITAR DUPLICADOS INFINITOS
-    setTimeout(() => {
-        saveData(false).catch(console.error);
-    }, 1000);
+    if (persistImmediate) {
+        setTimeout(() => {
+            saveData(false).catch(console.error);
+        }, 500);
+    }
 }
 
 async function loadData() {

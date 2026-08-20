@@ -279,12 +279,17 @@ window.ServerSync = {
     logout() {
         localStorage.removeItem('app_sync_user');
         localStorage.removeItem('app_sync_pin');
+        localStorage.removeItem('studio_data_v2');
+        localStorage.removeItem('studio_data_v2_idb');
         this._uploadConfig = null;
 
         // 1. Limpiar completamente los datos del usuario anterior de la memoria y del almacenamiento local por privacidad
-        window.appData = { subjects: [], notes: {} };
-        localStorage.removeItem('studio_data_v2');
-        localStorage.removeItem('studio_data_v2_idb');
+        if (typeof applyParsedAppData === 'function') {
+            applyParsedAppData({ subjects: [], notes: {} }, false);
+        } else {
+            window.appData = { subjects: [], notes: {} };
+        }
+
         if (window.idb && typeof window.idb.clearAllStores === 'function') {
             window.idb.clearAllStores().catch(() => {});
         }
@@ -305,8 +310,10 @@ window.ServerSync = {
             window.currentState.isDirty = false;
         }
 
-        // 3. Re-renderizar lista de materias (ahora limpia y vacía)
+        // 3. Re-renderizar lista de materias y fuentes IA (ahora limpias y vacías)
         if (typeof renderSubjects === 'function') renderSubjects();
+        if (typeof renderManageSubjects === 'function') renderManageSubjects();
+        if (typeof renderAiSources === 'function') renderAiSources();
 
         if (typeof closeModal === 'function') closeModal('login-modal');
         if (typeof showToast === 'function') showToast('Sesión cerrada. Espacio de trabajo limpio.', 'info');

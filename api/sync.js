@@ -57,7 +57,7 @@ export default async function handler(req, res) {
 
   const action = req.query.action || body.action;
 
-  async function davFetch(url, options = {}, timeoutMs = 12000) {
+  async function davFetch(url, options = {}, timeoutMs = 10000) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -73,7 +73,7 @@ export default async function handler(req, res) {
       return resp;
     } catch (err) {
       clearTimeout(timer);
-      throw new Error(`Error conectando a Nextcloud (${baseUrl}): ${err.message}`);
+      throw new Error(`Error de conexión con el servidor (${baseUrl}): ${err.message}`);
     }
   }
 
@@ -101,24 +101,28 @@ export default async function handler(req, res) {
   }
 
   async function getStoredAuth() {
-    if (!userId) return null;
+    if (!userId) return { error: 'Falta usuario' };
     const authFileUrl = `${userRoot}/auth.json`;
     try {
       const check = await davFetch(authFileUrl, { method: 'GET' });
-      if (check.ok) {
-        return await check.json();
+      if (check.status === 404) {
+        return { notFound: true };
       }
+      if (check.ok) {
+        const data = await check.json();
+        return { success: true, data };
+      }
+      return { error: `Servidor respondió ${check.status}` };
     } catch (e) {
-      // Ignore
+      return { serverUnreachable: true, error: e.message };
     }
-    return null;
   }
 
   try {
     // 1. ESTADO DEL SERVIDOR
     if (action === 'status') {
       try {
-        const resp = await davFetch(webdavRoot, { method: 'PROPFIND' }, 5000);
+        const resp = await davFetch(webdavRoot, { method: 'PROPFIND' }, 4000);
         if (resp.status >= 200 && resp.status < 300) {
           return res.status(200).json({ online: true, server: 'Nextcloud' });
         }
@@ -131,14 +135,17 @@ export default async function handler(req, res) {
     // 2. OBTENER PREGUNTA DE SEGURIDAD DEL USUARIO (para la vista de recuperación)
     if (action === 'getSecurityQuestion') {
       if (!userId) return res.status(400).json({ error: 'Ingresa un usuario' });
-      const storedAuth = await getStoredAuth();
-      if (!storedAuth) {
+      const authResult = await getStoredAuth();
+      if (authResult.serverUnreachable) {
+        return res.status(503).json({ error: `Servidor inaccesible. Verifica NEXTCLOUD_URL en Vercel.` });
+      }
+      if (authResult.notFound || !authResult.data) {
         return res.status(404).json({ error: 'El usuario especificado no existe.' });
       }
       return res.status(200).json({
         success: true,
         userId,
-        securityQuestion: storedAuth.securityQuestion || 'mascota'
+        securityQuestion: authResult.data.securityQuestion || 'mascota'
       });
     }
 
@@ -148,12 +155,15 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Debes ingresar un nombre de usuario y una contraseña.' });
       }
       
-      await ensureUserHierarchy();
-
-      const existingAuth = await getStoredAuth();
-      if (existingAuth) {
+      const authResult = await getStoredAuth();
+      if (authResult.serverUnreachable) {
+        return res.status(503).json({ error: `No se pudo conectar con tu servidor en la nube (${baseUrl}).` });
+      }
+      if (authResult.data) {
         return res.status(400).json({ error: 'Este usuario ya está registrado. Por favor inicia sesión.' });
       }
+
+      await ensureUserHierarchy();
 
       const securityQuestion = body.securityQuestion || req.query.securityQuestion || 'mascota';
       const securityAnswer = body.securityAnswer || req.query.securityAnswer || '';
@@ -188,11 +198,15 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Faltan datos para la recuperación.' });
       }
 
-      const storedAuth = await getStoredAuth();
-      if (!storedAuth) {
+      const authResult = await getStoredAuth();
+      if (authResult.serverUnreachable) {
+        return res.status(503).json({ error: `Servidor inaccesible. Verifica conexión.` });
+      }
+      if (authResult.notFound || !authResult.data) {
         return res.status(404).json({ error: 'El usuario especificado no existe.' });
       }
 
+      const storedAuth = authResult.data;
       const expectedAnswerHash = storedAuth.securityAnswerHash || storedAuth.recoveryHash;
       if (!expectedAnswerHash || expectedAnswerHash !== hashString(securityAnswer)) {
         return res.status(401).json({ error: 'La respuesta a la pregunta de seguridad es incorrecta.' });
@@ -213,10 +227,14 @@ export default async function handler(req, res) {
     // 5. INICIAR SESIÓN / VALIDACIÓN
     if (action === 'login' || action === 'auth') {
       if (!userId) return res.status(400).json({ error: 'Ingresa un usuario' });
-      const storedAuth = await getStoredAuth();
-      if (!storedAuth) {
-        return res.status(404).json({ error: 'El usuario no existe. Por favor crea una cuenta primero.' });
+      const authResult = await getStoredAuth();
+      if (authResult.serverUnreachable) {
+        return res.status(503).json({ error: `No se pudo conectar con el servidor Nextcloud (${baseUrl}). Revisa que el túnel esté encendido.` });
       }
+      if (authResult.notFound || !authResult.data) {
+        return res.status(404).json({ error: `El usuario "${userId}" no existe. Por favor crea tu cuenta primero en la pestaña "Crear Cuenta".` });
+      }
+      const storedAuth = authResult.data;
       if (storedAuth.pinHash && storedAuth.pinHash !== userPinHash) {
         return res.status(401).json({ error: 'Contraseña o PIN incorrecto.' });
       }
@@ -224,8 +242,8 @@ export default async function handler(req, res) {
     }
 
     // Validar credenciales del usuario para acciones de datos
-    const storedAuth = await getStoredAuth();
-    if (!storedAuth || (storedAuth.pinHash && storedAuth.pinHash !== userPinHash)) {
+    const authResult = await getStoredAuth();
+    if (authResult.serverUnreachable || !authResult.data || (authResult.data.pinHash && authResult.data.pinHash !== userPinHash)) {
       return res.status(401).json({ error: 'No autorizado. Inicia sesión con tus credenciales.' });
     }
 
