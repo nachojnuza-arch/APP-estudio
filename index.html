@@ -104,14 +104,37 @@
             <ul id="subject-list" class="space-y-0.5"></ul>
         </div>
 
-        <div class="p-3 border-t border-slate-100 space-y-1.5 flex-shrink-0 bg-white">
+        <div class="p-3 border-t border-slate-100 space-y-2 flex-shrink-0 bg-white">
             <button type="button" onclick="openAddFileModal()" class="w-full bg-primary-600 hover:bg-primary-700 text-white rounded-xl py-2.5 text-sm font-medium transition-all flex items-center justify-center gap-2 shadow-sm">
                 <i class="fas fa-plus text-xs"></i> <span>Nuevo recurso</span>
             </button>
-            <button type="button" onclick="window.ServerSync.openAuthModal()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl py-2.5 text-sm font-medium flex items-center justify-center gap-2 transition">
-                <i id="drive-icon" class="fas fa-server text-primary-500"></i>
-                <span id="drive-sync-status">Sincronización</span>
-            </button>
+
+            <!-- Sección de Usuario y Sincronización Independiente -->
+            <div id="auth-user-bar" class="space-y-1.5">
+                <!-- Botón cuando NO ha iniciado sesión -->
+                <button type="button" id="btn-login-trigger" onclick="window.ServerSync.openAuthModal('login')" class="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl py-2.5 text-xs font-semibold flex items-center justify-center gap-2 transition shadow-sm border border-indigo-100">
+                    <i class="fas fa-user-circle text-sm"></i>
+                    <span>Iniciar Sesión / Crear Cuenta</span>
+                </button>
+
+                <!-- Tarjeta cuando SÍ ha iniciado sesión (con botón Cerrar Sesión dedicado) -->
+                <div id="logged-user-container" class="hidden flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl p-2 shadow-sm">
+                    <div class="flex items-center gap-2 truncate pr-1">
+                        <div class="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-sm">
+                            <span id="user-avatar-letter">U</span>
+                        </div>
+                        <div class="truncate text-left">
+                            <span id="logged-user-name" class="text-xs font-bold text-slate-800 block truncate">Usuario</span>
+                            <span id="sync-indicator-text" class="text-[10px] text-emerald-600 font-medium block">
+                                <i class="fas fa-check-circle text-[9px] text-emerald-500"></i> Nube sincronizada
+                            </span>
+                        </div>
+                    </div>
+                    <button type="button" onclick="window.ServerSync.logout()" title="Cerrar sesión" class="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1.5 rounded-lg text-xs font-semibold transition shrink-0 flex items-center gap-1 border border-rose-100 bg-white">
+                        <i class="fas fa-sign-out-alt"></i> <span>Salir</span>
+                    </button>
+                </div>
+            </div>
         </div>
     </aside>
 

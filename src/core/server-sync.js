@@ -271,6 +271,11 @@ window.ServerSync = {
             } else {
                 if (typeof showToast === 'function') showToast(data.error || 'Respuesta de seguridad incorrecta', 'error');
             }
+        } catch (e) {
+            if (typeof showToast === 'function') showToast('Error al conectar con el servidor', 'error');
+        }
+    },
+
     logout() {
         localStorage.removeItem('app_sync_user');
         localStorage.removeItem('app_sync_pin');
@@ -363,30 +368,31 @@ window.ServerSync = {
     },
 
     updateUI() {
-        const statusEl = document.getElementById('drive-sync-status');
-        const iconEl = document.getElementById('drive-icon');
-        if (!statusEl) return;
-
         const user = this.getUserId();
+        const btnLogin = document.getElementById('btn-login-trigger');
+        const loggedCont = document.getElementById('logged-user-container');
+        const loggedName = document.getElementById('logged-user-name');
+        const avatarLetter = document.getElementById('user-avatar-letter');
+        const syncIndicator = document.getElementById('sync-indicator-text');
 
-        if (this.isSyncing) {
-            statusEl.textContent = user ? `Sincronizando (${user})...` : 'Sincronizando...';
-            if (iconEl) iconEl.className = 'fas fa-spinner fa-spin text-sky-400';
-            return;
-        }
+        if (this.isConnected()) {
+            if (btnLogin) btnLogin.classList.add('hidden');
+            if (loggedCont) loggedCont.classList.remove('hidden');
+            if (loggedName) loggedName.textContent = user;
+            if (avatarLetter) avatarLetter.textContent = user.charAt(0).toUpperCase();
 
-        if (this.isConnected() && this.isServerOnline) {
-            statusEl.textContent = `Nube: ${user}`;
-            if (iconEl) iconEl.className = 'fas fa-cloud text-emerald-400';
-            statusEl.title = `Conectado como ${user}. Datos respaldados en el servidor.`;
-        } else if (this.isConnected() && !this.isServerOnline) {
-            statusEl.textContent = `Nube (${user}) [Offline]`;
-            if (iconEl) iconEl.className = 'fas fa-cloud text-amber-400';
-            statusEl.title = 'Servidor apagado. Guardando copia local segura.';
+            if (syncIndicator) {
+                if (this.isSyncing) {
+                    syncIndicator.innerHTML = '<i class="fas fa-spinner fa-spin text-sky-500"></i> Sincronizando...';
+                } else if (this.isServerOnline) {
+                    syncIndicator.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span> Nube sincronizada';
+                } else {
+                    syncIndicator.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block"></span> Servidor offline';
+                }
+            }
         } else {
-            statusEl.textContent = 'Modo Local';
-            if (iconEl) iconEl.className = 'fas fa-hdd text-slate-400';
-            statusEl.title = 'Usando memoria del navegador. Pulsa para conectar a tu nube.';
+            if (btnLogin) btnLogin.classList.remove('hidden');
+            if (loggedCont) loggedCont.classList.add('hidden');
         }
     },
 
