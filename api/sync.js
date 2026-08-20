@@ -124,11 +124,11 @@ export default async function handler(req, res) {
       try {
         const resp = await davFetch(webdavRoot, { method: 'PROPFIND' }, 4000);
         if (resp.status >= 200 && resp.status < 300) {
-          return res.status(200).json({ online: true, server: 'Nextcloud' });
+          return res.status(200).json({ online: true, targetUrl: baseUrl, server: 'Nextcloud' });
         }
-        return res.status(200).json({ online: false, message: 'Servidor no responde' });
+        return res.status(200).json({ online: false, targetUrl: baseUrl, message: 'Servidor no responde' });
       } catch (err) {
-        return res.status(200).json({ online: false, message: err.message });
+        return res.status(200).json({ online: false, targetUrl: baseUrl, message: err.message });
       }
     }
 
