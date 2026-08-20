@@ -108,9 +108,9 @@
             <button type="button" onclick="openAddFileModal()" class="w-full bg-primary-600 hover:bg-primary-700 text-white rounded-xl py-2.5 text-sm font-medium transition-all flex items-center justify-center gap-2 shadow-sm">
                 <i class="fas fa-plus text-xs"></i> <span>Nuevo recurso</span>
             </button>
-            <button type="button" onclick="openModal('login-modal')" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl py-2.5 text-sm font-medium flex items-center justify-center gap-2 transition">
-                <i id="drive-icon" class="fas fa-cloud text-slate-400"></i>
-                <span id="drive-status-text">Drive</span>
+            <button type="button" onclick="window.ServerSync.openAuthModal()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl py-2.5 text-sm font-medium flex items-center justify-center gap-2 transition">
+                <i id="drive-icon" class="fas fa-server text-primary-500"></i>
+                <span id="drive-sync-status">Sincronización</span>
             </button>
         </div>
     </aside>
@@ -378,22 +378,44 @@
 
         <!-- Modal IA removido (ahora se usa Vercel Backend) -->
 
-        <!-- Modal: Drive Login -->
+        <!-- Modal: Sincronización en la Nube -->
         <div id="login-modal" class="modal-container hidden bg-white rounded-2xl shadow-2xl w-[90%] max-w-sm overflow-hidden">
-            <div class="p-8 text-center">
-                <div class="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4"><i class="fas fa-cloud text-white text-2xl"></i></div>
-                <h2 class="text-xl font-bold text-slate-800 mb-2">Google Drive</h2>
-                <p id="drive-modal-desc" class="text-sm text-slate-500 mb-6">Inicia sesión para guardar y sincronizar PDFs y notas en "APP Estudio - Datos".</p>
-                <button type="button" id="btn-login-drive" onclick="window.GoogleDriveSync.login()" class="w-full bg-white border border-slate-300 py-3 rounded-lg flex items-center justify-center gap-3 mb-3 font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
-                    <i class="fab fa-google text-red-500"></i> Iniciar sesión
+            <div class="p-6 text-center">
+                <div class="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-3 text-2xl">
+                    <i class="fas fa-cloud-arrow-up"></i>
+                </div>
+                <h2 class="text-xl font-bold text-slate-800 mb-1">Sincronización en la Nube</h2>
+                <p id="drive-modal-desc" class="text-xs text-slate-500 mb-4">
+                    Guarda tus PDFs y notas de forma privada en tu servidor para acceder desde cualquier dispositivo.
+                </p>
+                
+                <div id="auth-form-container" class="space-y-3 text-left mb-4">
+                    <div>
+                        <label class="text-xs font-semibold text-slate-600 mb-1 block">Usuario o Alias:</label>
+                        <input type="text" id="sync-username-input" placeholder="ej. nacho" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold text-slate-600 mb-1 block">PIN o Contraseña:</label>
+                        <input type="password" id="sync-pin-input" placeholder="ej. 1234" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                    </div>
+                    <button type="button" onclick="window.ServerSync.loginFromModal()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm">
+                        <i class="fas fa-link"></i> Conectar y Sincronizar
+                    </button>
+                </div>
+
+                <div id="auth-connected-container" class="hidden mb-4 p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-left">
+                    <div class="flex items-center gap-2 text-emerald-700 text-sm font-bold mb-1">
+                        <i class="fas fa-check-circle"></i> Conectado a la Nube
+                    </div>
+                    <p class="text-xs text-emerald-600 mb-3">Usuario: <span id="connected-username" class="font-bold"></span></p>
+                    <button type="button" onclick="window.ServerSync.logout()" class="w-full bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 py-2 rounded-lg text-xs font-semibold transition-colors">
+                        <i class="fas fa-sign-out-alt"></i> Desconectar de la Nube
+                    </button>
+                </div>
+
+                <button type="button" onclick="closeModal('login-modal')" class="w-full text-xs text-slate-500 hover:text-slate-700 py-2 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors">
+                    Continuar en Modo Local
                 </button>
-                <button type="button" id="btn-logout-drive" onclick="window.GoogleDriveSync.logout()" class="hidden w-full bg-red-50 hover:bg-red-100 border border-red-200 py-3 rounded-lg flex items-center justify-center gap-3 mb-3 font-semibold text-red-600 transition-colors">
-                    <i class="fas fa-sign-out-alt"></i> Cerrar sesión de Drive
-                </button>
-                <button type="button" id="btn-skip-drive-session" onclick="window.GoogleDriveSync.skipDriveThisSession()" class="w-full text-sm text-slate-600 hover:text-slate-800 py-2 mb-2 border border-dashed border-slate-200 rounded-lg">
-                    Continuar solo en este dispositivo (esta sesión)
-                </button>
-                <button type="button" onclick="closeModal('login-modal')" class="text-sm text-slate-400 hover:text-slate-600">Cerrar ventana</button>
             </div>
         </div>
     </div>

@@ -10,36 +10,30 @@ window.ServerSync = {
     _checkInterval: null,
 
     getUserId() {
-        let u = localStorage.getItem('app_sync_user');
-        if (!u) {
-            u = 'nacho'; // Usuario por defecto o personalizable
-            localStorage.setItem('app_sync_user', u);
-        }
-        return u;
+        return localStorage.getItem('app_sync_user') || '';
     },
 
-    setUserId(newUserId) {
-        if (!newUserId) return;
-        const clean = String(newUserId).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
-        localStorage.setItem('app_sync_user', clean);
-        console.log(`[ServerSync] Usuario cambiado a: ${clean}`);
-        this.pullWorkspaceIfNewer();
-        this.updateUI();
+    getUserPin() {
+        return localStorage.getItem('app_sync_pin') || '';
+    },
+
+    isConnected() {
+        return !!this.getUserId();
     },
 
     async init() {
-        console.log(`[ServerSync] Inicializando conector con Servidor para usuario [${this.getUserId()}]...`);
+        console.log(`[ServerSync] Inicializando (Usuario actual: ${this.getUserId() || 'Modo Local'})...`);
         
-        // 1. Solicitar al navegador que proteja los datos locales contra borrado automático
+        // 1. Proteger almacenamiento local contra borrado automático
         this.requestPersistentStorage();
 
-        // 2. Revisar almacenamiento local
+        // 2. Comprobar espacio
         this.checkStorageQuota();
 
         this.updateUI();
         await this.checkServerStatus();
 
-        if (this.isServerOnline) {
+        if (this.isServerOnline && this.isConnected()) {
             await this.pullWorkspaceIfNewer();
         }
 
@@ -48,14 +42,83 @@ window.ServerSync = {
         }
     },
 
+    openAuthModal() {
+        const modal = document.getElementById('login-modal');
+        if (!modal) return;
+
+        const formCont = document.getElementById('auth-form-container');
+        const connCont = document.getElementById('auth-connected-container');
+        const connUser = document.getElementById('connected-username');
+        const userInput = document.getElementById('sync-username-input');
+        const pinInput = document.getElementById('sync-pin-input');
+
+        if (this.isConnected()) {
+            if (formCont) formCont.classList.add('hidden');
+            if (connCont) connCont.classList.remove('hidden');
+            if (connUser) connUser.textContent = this.getUserId();
+        } else {
+            if (formCont) formCont.classList.remove('hidden');
+            if (connCont) connCont.classList.add('hidden');
+            if (userInput) userInput.value = '';
+            if (pinInput) pinInput.value = '';
+        }
+
+        if (typeof openModal === 'function') openModal('login-modal');
+    },
+
+    async loginFromModal() {
+        const userInput = document.getElementById('sync-username-input');
+        const pinInput = document.getElementById('sync-pin-input');
+
+        const user = (userInput?.value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+        const pin = (pinInput?.value || '').trim();
+
+        if (!user) {
+            if (typeof showToast === 'function') showToast('Ingresa un nombre de usuario', 'error');
+            return;
+        }
+
+        try {
+            if (typeof showToast === 'function') showToast('Validando conexión...', 'info');
+
+            const res = await fetch(`/api/sync?action=auth&userId=${encodeURIComponent(user)}&pin=${encodeURIComponent(pin)}`, {
+                headers: {
+                    'X-User-Id': user,
+                    'X-User-Pin': pin
+                }
+            });
+
+            if (res.ok) {
+                localStorage.setItem('app_sync_user', user);
+                localStorage.setItem('app_sync_pin', pin);
+                if (typeof closeModal === 'function') closeModal('login-modal');
+                if (typeof showToast === 'function') showToast(`¡Conectado como ${user}! Sincronizando...`, 'success');
+                this.isServerOnline = true;
+                this.updateUI();
+                await this.pullWorkspaceIfNewer();
+                await this.syncAppData(window.appData);
+            } else {
+                const err = await res.json();
+                if (typeof showToast === 'function') showToast(err.error || 'PIN o usuario incorrecto', 'error');
+            }
+        } catch (e) {
+            if (typeof showToast === 'function') showToast('No se pudo conectar al servidor', 'error');
+        }
+    },
+
+    logout() {
+        localStorage.removeItem('app_sync_user');
+        localStorage.removeItem('app_sync_pin');
+        if (typeof closeModal === 'function') closeModal('login-modal');
+        if (typeof showToast === 'function') showToast('Desconectado de la nube. Modo local activo.', 'info');
+        this.updateUI();
+    },
+
     async requestPersistentStorage() {
         if (navigator.storage && navigator.storage.persist) {
             try {
-                const isPersisted = await navigator.storage.persist();
-                console.log(`[ServerSync] Almacenamiento persistente en navegador: ${isPersisted ? 'ACTIVADO' : 'ESTÁNDAR'}`);
-            } catch (e) {
-                // Ignore
-            }
+                await navigator.storage.persist();
+            } catch (e) {}
         }
     },
 
@@ -66,27 +129,24 @@ window.ServerSync = {
                 const usedMB = ((estimate.usage || 0) / (1024 * 1024)).toFixed(1);
                 const quotaMB = ((estimate.quota || 0) / (1024 * 1024)).toFixed(1);
                 console.log(`[ServerSync] Espacio navegador: ${usedMB} MB usados de ${quotaMB} MB disponibles.`);
-            } catch (e) {
-                // Ignore
-            }
+            } catch (e) {}
         }
     },
 
     getHeaders() {
-        return {
-            'Content-Type': 'application/json',
-            'X-User-Id': this.getUserId()
-        };
+        const headers = { 'Content-Type': 'application/json' };
+        if (this.isConnected()) {
+            headers['X-User-Id'] = this.getUserId();
+            headers['X-User-Pin'] = this.getUserPin();
+        }
+        return headers;
     },
 
     async checkServerStatus() {
         try {
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 4000);
-            const res = await fetch(`/api/sync?action=status&userId=${encodeURIComponent(this.getUserId())}`, {
-                headers: this.getHeaders(),
-                signal: controller.signal
-            });
+            const res = await fetch('/api/sync?action=status', { signal: controller.signal });
             clearTimeout(timeout);
             
             if (res.ok) {
@@ -94,11 +154,8 @@ window.ServerSync = {
                 const wasOffline = !this.isServerOnline;
                 this.isServerOnline = !!data.online;
                 
-                if (wasOffline && this.isServerOnline) {
-                    console.log('[ServerSync] ¡Servidor detectado online! Sincronizando datos pendientes...');
-                    if (typeof showToast === 'function') {
-                        showToast('Servidor conectado. Sincronizando datos...', 'success');
-                    }
+                if (wasOffline && this.isServerOnline && this.isConnected()) {
+                    console.log('[ServerSync] Servidor conectado. Sincronizando...');
                     this.flushPendingSync();
                 }
             } else {
@@ -113,22 +170,29 @@ window.ServerSync = {
 
     updateUI() {
         const statusEl = document.getElementById('drive-sync-status');
+        const iconEl = document.getElementById('drive-icon');
         if (!statusEl) return;
 
         const user = this.getUserId();
 
         if (this.isSyncing) {
-            statusEl.innerHTML = `<i class="fas fa-spinner fa-spin text-sky-400"></i> Sincronizando (${user})...`;
-            statusEl.title = 'Guardando cambios en tu servidor...';
+            statusEl.textContent = user ? `Sincronizando (${user})...` : 'Sincronizando...';
+            if (iconEl) iconEl.className = 'fas fa-spinner fa-spin text-sky-400';
             return;
         }
 
-        if (this.isServerOnline) {
-            statusEl.innerHTML = `<i class="fas fa-server text-emerald-400"></i> Nube: ${user}`;
-            statusEl.title = `Conectado a tu servidor Nextcloud (Usuario: ${user}). Datos sincronizados.`;
+        if (this.isConnected() && this.isServerOnline) {
+            statusEl.textContent = `Nube: ${user}`;
+            if (iconEl) iconEl.className = 'fas fa-cloud text-emerald-400';
+            statusEl.title = `Conectado como ${user}. Datos respaldados en el servidor.`;
+        } else if (this.isConnected() && !this.isServerOnline) {
+            statusEl.textContent = `Nube (${user}) [Offline]`;
+            if (iconEl) iconEl.className = 'fas fa-cloud text-amber-400';
+            statusEl.title = 'Servidor apagado. Guardando copia local segura.';
         } else {
-            statusEl.innerHTML = `<i class="fas fa-hdd text-amber-400"></i> Modo Local (${user})`;
-            statusEl.title = 'Servidor desconectado. Tus datos y PDFs se guardan 100% seguros en tu navegador.';
+            statusEl.textContent = 'Modo Local';
+            if (iconEl) iconEl.className = 'fas fa-hdd text-slate-400';
+            statusEl.title = 'Usando memoria del navegador. Pulsa para conectar a tu nube.';
         }
     },
 
@@ -136,6 +200,7 @@ window.ServerSync = {
     async syncAppData(appData) {
         if (!appData) return;
 
+        // Guardar SIEMPRE primero en IndexedDB y localStorage local
         const rawJson = JSON.stringify(appData);
         try {
             if (window.idb && typeof window.idb.putWorkspace === 'function') {
@@ -143,11 +208,11 @@ window.ServerSync = {
             }
             localStorage.setItem('studio_data_v2', rawJson);
         } catch (e) {
-            console.warn('[ServerSync] Error guardando localmente:', e);
+            console.warn('[ServerSync] Error guardando local:', e);
         }
 
-        if (!this.isServerOnline) {
-            this._pendingSync = true;
+        if (!this.isConnected() || !this.isServerOnline) {
+            this._pendingSync = this.isConnected();
             this.updateUI();
             return;
         }
@@ -160,12 +225,10 @@ window.ServerSync = {
                 const res = await fetch('/api/sync?action=putWorkspace', {
                     method: 'POST',
                     headers: this.getHeaders(),
-                    body: JSON.stringify({ data: appData, userId: this.getUserId() })
+                    body: JSON.stringify({ data: appData, userId: this.getUserId(), pin: this.getUserPin() })
                 });
                 if (res.ok) {
                     this._pendingSync = false;
-                } else {
-                    console.warn('[ServerSync] Error del servidor al guardar workspace');
                 }
             } catch (err) {
                 console.warn('[ServerSync] Error de red:', err);
@@ -179,15 +242,17 @@ window.ServerSync = {
     },
 
     async flushPendingSync() {
-        if (this._pendingSync && window.appData) {
+        if (this._pendingSync && window.appData && this.isConnected()) {
             await this.syncAppData(window.appData);
         }
     },
 
     // 2. DESCARGAR WORKSPACE
     async pullWorkspaceIfNewer() {
+        if (!this.isConnected()) return;
+
         try {
-            const res = await fetch(`/api/sync?action=getWorkspace&userId=${encodeURIComponent(this.getUserId())}`, {
+            const res = await fetch(`/api/sync?action=getWorkspace&userId=${encodeURIComponent(this.getUserId())}&pin=${encodeURIComponent(this.getUserPin())}`, {
                 headers: this.getHeaders()
             });
             if (res.ok) {
@@ -196,7 +261,7 @@ window.ServerSync = {
                     const serverData = result.data;
                     const localJson = localStorage.getItem('studio_data_v2');
                     if (!localJson || (serverData.subjects && serverData.subjects.length > 0 && !window.appData?.subjects?.length)) {
-                        console.log('[ServerSync] Restaurando datos desde el servidor...');
+                        console.log(`[ServerSync] Restaurando datos del usuario ${this.getUserId()} desde el servidor...`);
                         if (typeof applyParsedAppData === 'function') {
                             applyParsedAppData(serverData);
                             if (typeof renderAll === 'function') renderAll();
@@ -205,7 +270,7 @@ window.ServerSync = {
                 }
             }
         } catch (e) {
-            console.warn('[ServerSync] No se pudo verificar versión remota del workspace:', e);
+            console.warn('[ServerSync] No se pudo descargar workspace remoto:', e);
         }
     },
 
@@ -215,8 +280,8 @@ window.ServerSync = {
 
         const subName = subject ? (typeof subject === 'string' ? subject : subject.name) : 'General';
         
-        if (!this.isServerOnline) {
-            console.log(`[ServerSync] Servidor offline. PDF "${fileName}" guardado en IndexedDB.`);
+        if (!this.isConnected() || !this.isServerOnline) {
+            console.log(`[ServerSync] Guardado local en IndexedDB ("${fileName}").`);
             return null;
         }
 
@@ -241,14 +306,15 @@ window.ServerSync = {
                     filename: fileName,
                     subject: subName,
                     userId: this.getUserId(),
+                    pin: this.getUserPin(),
                     dataBase64: base64Data
                 })
             });
 
             if (res.ok) {
-                console.log(`[ServerSync] PDF "${fileName}" guardado en el servidor.`);
+                console.log(`[ServerSync] PDF "${fileName}" respaldado en el servidor.`);
                 if (typeof showToast === 'function') {
-                    showToast(`PDF respaldado en tu servidor (${subName})`, 'success');
+                    showToast(`PDF respaldado en tu nube (${subName})`, 'success');
                 }
                 return fileName;
             }
@@ -263,15 +329,14 @@ window.ServerSync = {
 
     // 4. DESCARGAR PDF
     async downloadPdf(subject, fileName) {
-        if (!fileName) return null;
+        if (!fileName || !this.isConnected()) return null;
         const subName = subject ? (typeof subject === 'string' ? subject : subject.name) : 'General';
 
         try {
-            const url = `/api/sync?action=getPdf&userId=${encodeURIComponent(this.getUserId())}&subject=${encodeURIComponent(subName)}&filename=${encodeURIComponent(fileName)}`;
+            const url = `/api/sync?action=getPdf&userId=${encodeURIComponent(this.getUserId())}&pin=${encodeURIComponent(this.getUserPin())}&subject=${encodeURIComponent(subName)}&filename=${encodeURIComponent(fileName)}`;
             const res = await fetch(url, { headers: this.getHeaders() });
             if (res.ok) {
-                const blob = await res.blob();
-                return blob;
+                return await res.blob();
             }
         } catch (err) {
             console.warn(`[ServerSync] Error descargando PDF "${fileName}":`, err);
@@ -281,10 +346,8 @@ window.ServerSync = {
 
     // 5. ELIMINAR PDF DEL SERVIDOR
     async deletePdf(subject, fileName) {
-        if (!fileName) return;
+        if (!fileName || !this.isConnected() || !this.isServerOnline) return;
         const subName = subject ? (typeof subject === 'string' ? subject : subject.name) : 'General';
-
-        if (!this.isServerOnline) return;
 
         try {
             await fetch('/api/sync?action=deletePdf', {
@@ -293,28 +356,29 @@ window.ServerSync = {
                 body: JSON.stringify({
                     filename: fileName,
                     subject: subName,
-                    userId: this.getUserId()
+                    userId: this.getUserId(),
+                    pin: this.getUserPin()
                 })
             });
-            console.log(`[ServerSync] PDF "${fileName}" eliminado del servidor.`);
         } catch (e) {
             console.warn('[ServerSync] Error eliminando PDF del servidor:', e);
         }
     },
 
-    async ensureSubjectFolder(subject) {
+    async ensureSubjectFolder() {
         return true;
     }
 };
 
-// Aliases para retrocompatibilidad
+// Retrocompatibilidad
 window.GoogleDriveSync = {
-    isLoggedIn: true,
+    isLoggedIn: () => window.ServerSync.isConnected(),
     init: () => window.ServerSync.init(),
     syncAppDataToDrive: (data) => window.ServerSync.syncAppData(data),
     uploadPdfToDrive: (blob, name, sub) => window.ServerSync.uploadPdf(blob, name, sub),
     downloadPdfFromDrive: (fileId, name, sub) => window.ServerSync.downloadPdf(sub, name || fileId),
     ensureSubjectFolder: (sub) => window.ServerSync.ensureSubjectFolder(sub),
-    login: () => window.ServerSync.checkServerStatus(),
+    login: () => window.ServerSync.openAuthModal(),
+    logout: () => window.ServerSync.logout(),
     updateUI: () => window.ServerSync.updateUI()
 };

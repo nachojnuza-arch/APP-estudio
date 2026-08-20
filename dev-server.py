@@ -5,6 +5,7 @@ import urllib.request
 import urllib.parse
 import json
 import base64
+import hashlib
 import os
 import sys
 
@@ -18,11 +19,14 @@ auth_bytes = f"{NEXTCLOUD_USER}:{NEXTCLOUD_TOKEN}".encode("utf-8")
 AUTH_HEADER = f"Basic {base64.b64encode(auth_bytes).decode('utf-8')}"
 WEBDAV_ROOT = f"{NEXTCLOUD_URL}/remote.php/dav/files/{urllib.parse.quote(NEXTCLOUD_USER)}/{urllib.parse.quote(NEXTCLOUD_DIR)}"
 
+def hash_pin(pin):
+    return hashlib.sha256(str(pin or "").encode('utf-8')).hexdigest()
+
 class DevHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-User-Id')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-User-Id, X-User-Pin')
         super().end_headers()
 
     def do_OPTIONS(self):
@@ -62,10 +66,42 @@ class DevHandler(http.server.SimpleHTTPRequestHandler):
         except Exception:
             pass
 
+    def check_auth(self, user_id, pin):
+        if not user_id:
+            return False, "Usuario no especificado"
+        user_root = self.get_user_root(user_id)
+        self.ensure_dir(f"{WEBDAV_ROOT}/users")
+        self.ensure_dir(user_root)
+
+        pin_h = hash_pin(pin)
+        auth_url = f"{user_root}/auth.json"
+        try:
+            req = urllib.request.Request(auth_url, headers={"Authorization": AUTH_HEADER}, method="GET")
+            with urllib.request.urlopen(req, timeout=4) as resp:
+                stored = json.loads(resp.read().decode('utf-8'))
+                if stored.get("pinHash") and stored.get("pinHash") != pin_h:
+                    return False, "PIN o contraseña incorrecta"
+                return True, "OK"
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                # First time registration
+                if pin:
+                    auth_data = json.dumps({"userId": user_id, "pinHash": pin_h}).encode('utf-8')
+                    put_req = urllib.request.Request(auth_url, data=auth_data, headers={"Authorization": AUTH_HEADER, "Content-Type": "application/json"}, method="PUT")
+                    try:
+                        urllib.request.urlopen(put_req, timeout=4)
+                    except Exception:
+                        pass
+                return True, "OK"
+        except Exception as e:
+            pass
+        return True, "OK"
+
     def handle_sync_get(self, parsed):
         qs = urllib.parse.parse_qs(parsed.query)
         action = qs.get("action", [""])[0]
-        user_id = self.headers.get("X-User-Id") or qs.get("userId", ["nacho"])[0]
+        user_id = self.headers.get("X-User-Id") or qs.get("userId", [""])[0]
+        pin = self.headers.get("X-User-Pin") or qs.get("pin", [""])[0]
         user_root = self.get_user_root(user_id)
 
         if action == "status":
@@ -73,11 +109,20 @@ class DevHandler(http.server.SimpleHTTPRequestHandler):
                 req = urllib.request.Request(WEBDAV_ROOT, headers={"Authorization": AUTH_HEADER}, method="PROPFIND")
                 with urllib.request.urlopen(req, timeout=3) as resp:
                     if 200 <= resp.status < 300:
-                        self.send_json(200, {"online": True, "server": "Nextcloud (Local Dev)", "userId": user_id})
+                        self.send_json(200, {"online": True, "server": "Nextcloud (Local Dev)"})
                         return
                 self.send_json(200, {"online": False, "message": "Respuesta no exitosa"})
             except Exception as e:
                 self.send_json(200, {"online": False, "message": str(e)})
+            return
+
+        ok, msg = self.check_auth(user_id, pin)
+        if not ok:
+            self.send_json(401, {"error": msg})
+            return
+
+        if action == "auth":
+            self.send_json(200, {"success": True, "userId": user_id})
             return
 
         if action == "getWorkspace":
@@ -131,12 +176,21 @@ class DevHandler(http.server.SimpleHTTPRequestHandler):
 
         qs = urllib.parse.parse_qs(parsed.query)
         action = qs.get("action", [""])[0] or body.get("action", "")
-        user_id = self.headers.get("X-User-Id") or body.get("userId") or qs.get("userId", ["nacho"])[0]
+        user_id = self.headers.get("X-User-Id") or body.get("userId") or qs.get("userId", [""])[0]
+        pin = self.headers.get("X-User-Pin") or body.get("pin") or qs.get("pin", [""])[0]
         user_root = self.get_user_root(user_id)
 
-        # Ensure base directories exist
+        ok, msg = self.check_auth(user_id, pin)
+        if not ok:
+            self.send_json(401, {"error": msg})
+            return
+
         self.ensure_dir(f"{WEBDAV_ROOT}/users")
         self.ensure_dir(user_root)
+
+        if action == "auth":
+            self.send_json(200, {"success": True, "userId": user_id})
+            return
 
         if action == "putWorkspace":
             payload = body.get("data", body)
