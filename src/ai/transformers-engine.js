@@ -89,23 +89,27 @@ window.TransformersEngine = {
         // 🆕 NUEVO: Intentar recuperar desde IndexedDB
         if (typeof idb !== 'undefined') {
             const cachedData = await idb.getEmbedding(fileId);
-            if (cachedData && cachedData.chunks && cachedData.embeddings) {
-                console.log(`🧠 Memoria IA: Vectores recuperados del disco para ${fileId}`);
+            if (cachedData && cachedData.chunks && cachedData.embeddings && Math.abs(cachedData.chunks.length - textChunks.length) < 5) {
+                console.log(`🧠 Memoria IA: Vectores recuperados del disco para ${fileId} (${cachedData.chunks.length} chunks)`);
                 this.embeddingCache.set(fileId, cachedData);
                 return cachedData;
+            } else if (cachedData) {
+                console.log(`⚠️ Memoria IA: Cache invalidado para ${fileId} (Chunks difieren: guardado ${cachedData.chunks?.length || 0} vs actual ${textChunks.length}). Recalculando...`);
             }
             
             // Si no está en disco, intentar descargarlo de Drive si la sesión está iniciada
             if (window.GoogleDriveSync && window.GoogleDriveSync.isLoggedIn) {
                 console.log(`☁️ Buscando vectores en Drive para ${fileId}...`);
                 const driveData = await window.GoogleDriveSync.syncEmbeddingsFromDrive(fileId);
-                if (driveData && driveData.chunks && driveData.embeddings) {
-                    console.log(`🧠 Memoria IA: Vectores recuperados de Google Drive para ${fileId}`);
+                if (driveData && driveData.chunks && driveData.embeddings && Math.abs(driveData.chunks.length - textChunks.length) < 5) {
+                    console.log(`🧠 Memoria IA: Vectores recuperados de Google Drive para ${fileId} (${driveData.chunks.length} chunks)`);
                     // Transformar de array normal a Float32Array
                     driveData.embeddings = driveData.embeddings.map(arr => new Float32Array(Object.values(arr)));
                     this.embeddingCache.set(fileId, driveData);
                     await idb.saveEmbedding(fileId, driveData); // Guardar en local para la próxima
                     return driveData;
+                } else if (driveData) {
+                    console.log(`⚠️ Memoria IA: Cache de Drive invalidado para ${fileId} (Chunks difieren)`);
                 }
             }
         }

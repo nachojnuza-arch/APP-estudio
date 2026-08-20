@@ -108,9 +108,9 @@
             <button type="button" onclick="openAddFileModal()" class="w-full bg-primary-600 hover:bg-primary-700 text-white rounded-xl py-2.5 text-sm font-medium transition-all flex items-center justify-center gap-2 shadow-sm">
                 <i class="fas fa-plus text-xs"></i> <span>Nuevo recurso</span>
             </button>
-            <button type="button" onclick="openModal('login-modal')" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl py-2.5 text-sm font-medium flex items-center justify-center gap-2 transition">
-                <i id="drive-icon" class="fas fa-cloud text-slate-400"></i>
-                <span id="drive-status-text">Drive</span>
+            <button type="button" onclick="window.ServerSync.openAuthModal()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl py-2.5 text-sm font-medium flex items-center justify-center gap-2 transition">
+                <i id="drive-icon" class="fas fa-server text-primary-500"></i>
+                <span id="drive-sync-status">Sincronización</span>
             </button>
         </div>
     </aside>
@@ -187,6 +187,11 @@
                     <button type="button" onclick="changeZoom(-0.2)" title="Alejar" class="w-8 h-8 rounded-lg hover:bg-slate-100 hidden sm:flex items-center justify-center text-slate-600"><i class="fas fa-minus"></i></button>
                     <button type="button" onclick="changeZoom(0.2)" title="Acercar" class="w-8 h-8 rounded-lg hover:bg-slate-100 hidden sm:flex items-center justify-center text-slate-600"><i class="fas fa-plus"></i></button>
                     <span id="zoom-info" class="hidden"></span>
+
+                    <div class="w-px h-6 bg-slate-200"></div>
+
+                    <button type="button" onclick="rotatePdf(-90)" title="Girar 90° izquierda (Shift+R)" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-600 hover:text-indigo-600 transition-colors"><i class="fas fa-undo"></i></button>
+                    <button type="button" onclick="rotatePdf(90)" title="Girar 90° derecha (R)" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-600 hover:text-indigo-600 transition-colors"><i class="fas fa-redo"></i></button>
                 </div>
             </div>
 
@@ -373,22 +378,121 @@
 
         <!-- Modal IA removido (ahora se usa Vercel Backend) -->
 
-        <!-- Modal: Drive Login -->
+        <!-- Modal: Sincronización en la Nube -->
         <div id="login-modal" class="modal-container hidden bg-white rounded-2xl shadow-2xl w-[90%] max-w-sm overflow-hidden">
-            <div class="p-8 text-center">
-                <div class="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4"><i class="fas fa-cloud text-white text-2xl"></i></div>
-                <h2 class="text-xl font-bold text-slate-800 mb-2">Google Drive</h2>
-                <p id="drive-modal-desc" class="text-sm text-slate-500 mb-6">Inicia sesión para guardar y sincronizar PDFs y notas en "APP Estudio - Datos".</p>
-                <button type="button" id="btn-login-drive" onclick="window.GoogleDriveSync.login()" class="w-full bg-white border border-slate-300 py-3 rounded-lg flex items-center justify-center gap-3 mb-3 font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
-                    <i class="fab fa-google text-red-500"></i> Iniciar sesión
+            <div class="p-6 text-center">
+                <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-2 text-xl">
+                    <i class="fas fa-cloud-arrow-up"></i>
+                </div>
+                <h2 class="text-lg font-bold text-slate-800 mb-1">Sincronización en la Nube</h2>
+                <p class="text-xs text-slate-500 mb-4">
+                    Respalda y accede a tus PDFs y apuntes desde cualquier dispositivo.
+                </p>
+
+                <div id="auth-tabs-container">
+                    <!-- Pestañas Iniciar Sesión / Crear Cuenta -->
+                    <div class="flex bg-slate-100 p-1 rounded-xl mb-4">
+                        <button type="button" id="tab-btn-auth-login" onclick="window.ServerSync.setAuthTab('login')" class="flex-1 py-2 text-xs font-bold rounded-lg bg-white shadow-sm text-indigo-600 transition-all">
+                            Iniciar Sesión
+                        </button>
+                        <button type="button" id="tab-btn-auth-register" onclick="window.ServerSync.setAuthTab('register')" class="flex-1 py-2 text-xs font-bold rounded-lg text-slate-500 hover:text-slate-700 transition-all">
+                            Crear Cuenta
+                        </button>
+                    </div>
+
+                    <!-- Vista 1: Iniciar Sesión -->
+                    <div id="auth-view-login" class="space-y-3 text-left mb-4">
+                        <div>
+                            <label class="text-xs font-semibold text-slate-600 mb-1 block">Usuario:</label>
+                            <input type="text" id="login-username-input" placeholder="ej. nacho" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-slate-600 mb-1 block">Contraseña:</label>
+                            <input type="password" id="login-pin-input" placeholder="Tu contraseña" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                        </div>
+                        <button type="button" onclick="window.ServerSync.loginFromModal()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm">
+                            <i class="fas fa-sign-in-alt"></i> Ingresar
+                        </button>
+                        <div class="text-center pt-1">
+                            <button type="button" onclick="window.ServerSync.setAuthTab('recover')" class="text-xs text-indigo-600 hover:underline">
+                                ¿Olvidaste tu contraseña?
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Vista 2: Crear Cuenta -->
+                    <div id="auth-view-register" class="hidden space-y-2.5 text-left mb-4">
+                        <div>
+                            <label class="text-xs font-semibold text-slate-600 mb-1 block">Nombre de Usuario:</label>
+                            <input type="text" id="register-username-input" placeholder="ej. nacho" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-slate-600 mb-1 block">Contraseña:</label>
+                            <input type="password" id="register-pin-input" placeholder="Mínimo 3 caracteres" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-slate-600 mb-1 block">Confirmar Contraseña:</label>
+                            <input type="password" id="register-pin-confirm-input" placeholder="Repite tu contraseña" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-slate-600 mb-1 block">Pregunta de Seguridad:</label>
+                            <select id="register-question-select" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-indigo-500 bg-white text-slate-700">
+                                <option value="mascota">¿Cómo se llama tu primera mascota?</option>
+                                <option value="ciudad">¿En qué ciudad naciste?</option>
+                                <option value="comida">¿Cuál es tu comida favorita?</option>
+                                <option value="escuela">¿Nombre de tu escuela primaria?</option>
+                                <option value="equipo">¿Cuál es tu equipo o deporte favorito?</option>
+                                <option value="amigo">¿Nombre de tu mejor amigo/a de la infancia?</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-slate-600 mb-1 block">Tu Respuesta:</label>
+                            <input type="text" id="register-answer-input" placeholder="Tu respuesta secreta" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                            <span class="text-[10px] text-slate-400">Te servirá para recuperar la cuenta si olvidas la clave.</span>
+                        </div>
+                        <button type="button" onclick="window.ServerSync.registerFromModal()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm mt-2">
+                            <i class="fas fa-user-plus"></i> Registrar Cuenta
+                        </button>
+                    </div>
+
+                    <!-- Vista 3: Recuperar Contraseña -->
+                    <div id="auth-view-recover" class="hidden space-y-2.5 text-left mb-4">
+                        <div>
+                            <label class="text-xs font-semibold text-slate-600 mb-1 block">Tu Usuario:</label>
+                            <input type="text" id="recover-username-input" onblur="window.ServerSync.fetchUserQuestionForRecovery()" oninput="window.ServerSync.fetchUserQuestionForRecovery()" placeholder="Tu usuario registrado" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label id="recover-question-label" class="text-xs font-semibold text-slate-600 mb-1 block">Respuesta a tu Pregunta de Seguridad:</label>
+                            <input type="text" id="recover-answer-input" placeholder="Escribe tu respuesta" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-slate-600 mb-1 block">Nueva Contraseña:</label>
+                            <input type="password" id="recover-new-pin-input" placeholder="Tu nueva contraseña" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                        </div>
+                        <button type="button" onclick="window.ServerSync.recoverFromModal()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm mt-2">
+                            <i class="fas fa-key"></i> Restablecer Contraseña
+                        </button>
+                        <div class="text-center pt-1">
+                            <button type="button" onclick="window.ServerSync.setAuthTab('login')" class="text-xs text-slate-500 hover:text-slate-700">
+                                ← Volver a Iniciar Sesión
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="auth-connected-container" class="hidden mb-4 p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-left">
+                    <div class="flex items-center gap-2 text-emerald-700 text-sm font-bold mb-1">
+                        <i class="fas fa-check-circle"></i> Conectado a la Nube
+                    </div>
+                    <p class="text-xs text-emerald-600 mb-3">Usuario: <span id="connected-username" class="font-bold"></span></p>
+                    <button type="button" onclick="window.ServerSync.logout()" class="w-full bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 py-2 rounded-lg text-xs font-semibold transition-colors">
+                        <i class="fas fa-sign-out-alt"></i> Desconectar de la Nube
+                    </button>
+                </div>
+
+                <button type="button" onclick="closeModal('login-modal')" class="w-full text-xs text-slate-500 hover:text-slate-700 py-2 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors">
+                    Continuar en Modo Local
                 </button>
-                <button type="button" id="btn-logout-drive" onclick="window.GoogleDriveSync.logout()" class="hidden w-full bg-red-50 hover:bg-red-100 border border-red-200 py-3 rounded-lg flex items-center justify-center gap-3 mb-3 font-semibold text-red-600 transition-colors">
-                    <i class="fas fa-sign-out-alt"></i> Cerrar sesión de Drive
-                </button>
-                <button type="button" id="btn-skip-drive-session" onclick="window.GoogleDriveSync.skipDriveThisSession()" class="w-full text-sm text-slate-600 hover:text-slate-800 py-2 mb-2 border border-dashed border-slate-200 rounded-lg">
-                    Continuar solo en este dispositivo (esta sesión)
-                </button>
-                <button type="button" onclick="closeModal('login-modal')" class="text-sm text-slate-400 hover:text-slate-600">Cerrar ventana</button>
             </div>
         </div>
     </div>
@@ -409,16 +513,15 @@
     <script src="src/features/pdf-viewer.js"></script>
     <script src="src/features/screenshot.js"></script>
     
-    <!-- Sincronización con Google Drive -->
-    <script src="google-drive-sync.js"></script>
+    <!-- Sincronización con Servidor Propio (Nextcloud) -->
+    <script src="src/core/server-sync.js"></script>
 
-    <!-- IA: Motor Transformers (100% Local Browser) -->
-    <script type="module">
-        import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
-        env.allowLocalModels = false;
-        window.TransformersAPI = { pipeline, env };
-    </script>
-    <script src="src/ai/transformers-engine.js"></script>
+    <!-- IA: Motor Local (local-summary.js modularizado) -->
+    <script src="src/ai/config-dict.js"></script>
+    <script src="src/ai/utils-translate.js"></script>
+    <script src="src/ai/tfidf-vectors.js"></script>
+    <script src="src/ai/summary-engine.js"></script>
+    <script src="src/ai/local-init.js"></script>
 
     <!-- IA: Motor Principal (Original) -->
     <script src="ai-original.js"></script>

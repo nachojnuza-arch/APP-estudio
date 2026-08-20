@@ -57,6 +57,11 @@ function applyParsedAppData(parsed) {
     });
     if (!appData.notes) appData.notes = {};
     migrateNotesToPerSubject();
+    
+    // PERSISTIR ESTADO MIGRADO INMEDIATAMENTE PARA EVITAR DUPLICADOS INFINITOS
+    setTimeout(() => {
+        saveData(false).catch(console.error);
+    }, 1000);
 }
 
 async function loadData() {
@@ -76,7 +81,7 @@ async function loadData() {
     if (saved) {
         try {
             applyParsedAppData(JSON.parse(saved));
-            idb.putWorkspace(saved).catch(() => {});
+            idb.putWorkspace(JSON.stringify(appData)).catch(() => {});
             return;
         } catch (e) {
             console.warn('studio_data_v2 en localStorage ilegible', e);

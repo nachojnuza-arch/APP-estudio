@@ -490,6 +490,7 @@ window.GoogleDriveSync = {
         }
     },
     
+    // 8. Descarga un PDF desde Drive usando su ID (Pasa la primera vez o si borras caché local)
     async downloadPdfFromDrive(fileId) {
         try {
             const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, { 
@@ -500,76 +501,5 @@ window.GoogleDriveSync = {
             console.error("Error descargando PDF de Drive", e);
             return null; 
         }
-    },
-
-    // 9. Funciones para Vectores de Inteligencia Artificial (Embeddings)
-    async syncEmbeddingsToDrive(fileId, dataObj) {
-        if (!this.folderId || !this.token) return;
-        try {
-            const fileName = `embeddings_${fileId}.json`;
-            let search = await gapi.client.request({
-                path: 'https://www.googleapis.com/drive/v3/files',
-                params: { 
-                    q: `name='${fileName}' and '${this.folderId}' in parents and trashed=false`, 
-                    fields: 'files(id)' 
-                }
-            });
-
-            // Convert Float32Array to regular array for JSON serialization
-            const jsonSafeData = {
-                chunks: dataObj.chunks,
-                embeddings: dataObj.embeddings.map(arr => Array.from(arr))
-            };
-            const content = JSON.stringify(jsonSafeData);
-            
-            const metadata = { name: fileName, mimeType: 'application/json' };
-            const form = new FormData();
-            form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-            form.append('file', new Blob([content], { type: 'application/json' }));
-            
-            let uploadUrl = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
-            let method = 'POST';
-            
-            if (search.result.files && search.result.files.length > 0) {
-                uploadUrl = `https://www.googleapis.com/upload/drive/v3/files/${search.result.files[0].id}?uploadType=multipart`;
-                method = 'PATCH';
-            } else {
-                metadata.parents = [this.folderId];
-                form.set('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-            }
-
-            await fetch(uploadUrl, { method, headers: { 'Authorization': 'Bearer ' + this.token }, body: form });
-            console.log(`☁️ Vectores subidos a Drive para ${fileId}`);
-        } catch(e) {
-            console.error('Error guardando vectores en Drive', e);
-        }
-    },
-    
-    async syncEmbeddingsFromDrive(fileId) {
-        if (!this.folderId || !this.token) return null;
-        try {
-            const fileName = `embeddings_${fileId}.json`;
-            let search = await gapi.client.request({
-                path: 'https://www.googleapis.com/drive/v3/files',
-                params: { 
-                    q: `name='${fileName}' and '${this.folderId}' in parents and trashed=false`, 
-                    fields: 'files(id)' 
-                }
-            });
-
-            if (search.result.files && search.result.files.length > 0) {
-                const driveFileId = search.result.files[0].id;
-                const fileData = await gapi.client.request({ 
-                    path: `https://www.googleapis.com/drive/v3/files/${driveFileId}`, 
-                    params: { alt: 'media' } 
-                });
-                if (fileData.body) {
-                    return JSON.parse(fileData.body);
-                }
-            }
-        } catch(e) {
-            console.error('Error obteniendo vectores de Drive', e);
-        }
-        return null;
     }
 };
