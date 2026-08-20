@@ -423,16 +423,23 @@ window.ServerSync = {
             });
             if (res.ok) {
                 const result = await res.json();
-                if (result.exists && result.data) {
-                    const serverData = result.data;
-                    const localJson = localStorage.getItem('studio_data_v2');
-                    if (!localJson || (serverData.subjects && serverData.subjects.length > 0 && !window.appData?.subjects?.length)) {
+                const serverData = result.data;
+                const hasServerContent = serverData && Array.isArray(serverData.subjects) && serverData.subjects.length > 0;
+                const hasLocalContent = window.appData && Array.isArray(window.appData.subjects) && window.appData.subjects.length > 0;
+
+                if (result.exists && hasServerContent) {
+                    // Si el servidor tiene datos y localmente está vacío, restaurar de la nube
+                    if (!hasLocalContent) {
                         console.log(`[ServerSync] Restaurando datos del usuario ${this.getUserId()} desde el servidor...`);
                         if (typeof applyParsedAppData === 'function') {
                             applyParsedAppData(serverData);
                             if (typeof renderAll === 'function') renderAll();
                         }
                     }
+                } else if (!hasServerContent && hasLocalContent) {
+                    // Si la cuenta es nueva pero el usuario ya tenía apuntes/materias creadas en su pantalla, subirlas de inmediato a la nube
+                    console.log(`[ServerSync] Usuario nuevo con contenido local. Respaldando a la nube...`);
+                    await this.syncAppData(window.appData);
                 }
             }
         } catch (e) {

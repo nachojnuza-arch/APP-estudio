@@ -78,17 +78,21 @@ export default async function handler(req, res) {
   }
 
   async function ensureFolder(folderUrl) {
+    const cleanUrl = folderUrl.replace(/\/+$/, '');
     try {
-      const check = await davFetch(folderUrl, { method: 'PROPFIND' }, 4000);
+      const check = await davFetch(cleanUrl, { method: 'PROPFIND' }, 4000);
       if (check.status === 404) {
-        await davFetch(folderUrl, { method: 'MKCOL' }, 4000);
+        await davFetch(cleanUrl, { method: 'MKCOL' }, 4000);
       }
     } catch (e) {
-      // Ignorar si ya existe
+      try {
+        await davFetch(cleanUrl, { method: 'MKCOL' }, 4000);
+      } catch (e2) {}
     }
   }
 
   async function ensureUserHierarchy(subject) {
+    await ensureFolder(webdavRoot);
     await ensureFolder(`${webdavRoot}/users`);
     await ensureFolder(userRoot);
     if (subject) {
@@ -144,8 +148,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Debes ingresar un nombre de usuario y una contraseña.' });
       }
       
-      await ensureFolder(`${webdavRoot}/users`);
-      await ensureFolder(userRoot);
+      await ensureUserHierarchy();
 
       const existingAuth = await getStoredAuth();
       if (existingAuth) {
