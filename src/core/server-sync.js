@@ -447,6 +447,16 @@ window.ServerSync = {
             return null;
         }
 
+        // Límite de 4.2MB para subida serverless a la nube (archivos mayores quedan seguros en IndexedDB)
+        const sizeMB = (fileBlob.size / (1024 * 1024)).toFixed(1);
+        if (fileBlob.size > 4.2 * 1024 * 1024) {
+            console.log(`[ServerSync] PDF "${fileName}" (${sizeMB}MB) conservado localmente en IndexedDB.`);
+            if (typeof showToast === 'function') {
+                showToast(`PDF de ${sizeMB}MB guardado localmente en tu memoria`, 'info');
+            }
+            return fileName;
+        }
+
         try {
             this.isSyncing = true;
             this.updateUI();
@@ -477,6 +487,12 @@ window.ServerSync = {
                 console.log(`[ServerSync] PDF "${fileName}" respaldado en el servidor.`);
                 if (typeof showToast === 'function') {
                     showToast(`PDF respaldado en tu nube (${subName})`, 'success');
+                }
+                return fileName;
+            } else if (res.status === 413) {
+                console.log(`[ServerSync] PDF "${fileName}" (${sizeMB}MB) guardado localmente.`);
+                if (typeof showToast === 'function') {
+                    showToast(`PDF de ${sizeMB}MB guardado en el navegador`, 'info');
                 }
                 return fileName;
             }
