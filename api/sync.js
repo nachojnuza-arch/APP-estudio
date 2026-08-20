@@ -57,7 +57,7 @@ export default async function handler(req, res) {
 
   const action = req.query.action || body.action;
 
-  async function davFetch(url, options = {}, timeoutMs = 10000) {
+  async function davFetch(url, options = {}, timeoutMs = 15000) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -73,20 +73,20 @@ export default async function handler(req, res) {
       return resp;
     } catch (err) {
       clearTimeout(timer);
-      throw new Error(`Error de conexión con el servidor (${baseUrl}): ${err.message}`);
+      throw new Error(`Error conectando con Nextcloud (${baseUrl}): ${err.message}`);
     }
   }
 
   async function ensureFolder(folderUrl) {
     const cleanUrl = folderUrl.replace(/\/+$/, '');
     try {
-      const check = await davFetch(cleanUrl, { method: 'PROPFIND' }, 4000);
+      const check = await davFetch(cleanUrl, { method: 'PROPFIND' }, 10000);
       if (check.status === 404) {
-        await davFetch(cleanUrl, { method: 'MKCOL' }, 4000);
+        await davFetch(cleanUrl, { method: 'MKCOL' }, 10000);
       }
     } catch (e) {
       try {
-        await davFetch(cleanUrl, { method: 'MKCOL' }, 4000);
+        await davFetch(cleanUrl, { method: 'MKCOL' }, 10000);
       } catch (e2) {}
     }
   }
@@ -104,7 +104,7 @@ export default async function handler(req, res) {
     if (!userId) return { error: 'Falta usuario' };
     const authFileUrl = `${userRoot}/auth.json`;
     try {
-      const check = await davFetch(authFileUrl, { method: 'GET' });
+      const check = await davFetch(authFileUrl, { method: 'GET' }, 15000);
       if (check.status === 404) {
         return { notFound: true };
       }
@@ -122,13 +122,13 @@ export default async function handler(req, res) {
     // 1. ESTADO DEL SERVIDOR
     if (action === 'status') {
       try {
-        const resp = await davFetch(webdavRoot, { method: 'PROPFIND' }, 4000);
+        const resp = await davFetch(`${webdavRoot}/`, { method: 'PROPFIND' }, 15000);
         if (resp.status >= 200 && resp.status < 300) {
-          return res.status(200).json({ online: true, targetUrl: baseUrl, server: 'Nextcloud' });
+          return res.status(200).json({ online: true, server: 'Nextcloud' });
         }
-        return res.status(200).json({ online: false, targetUrl: baseUrl, message: 'Servidor no responde' });
+        return res.status(200).json({ online: false, message: `Servidor respondió status ${resp.status}` });
       } catch (err) {
-        return res.status(200).json({ online: false, targetUrl: baseUrl, message: err.message });
+        return res.status(200).json({ online: false, message: err.message });
       }
     }
 
@@ -137,7 +137,7 @@ export default async function handler(req, res) {
       if (!userId) return res.status(400).json({ error: 'Ingresa un usuario' });
       const authResult = await getStoredAuth();
       if (authResult.serverUnreachable) {
-        return res.status(503).json({ error: `Servidor inaccesible. Verifica NEXTCLOUD_URL en Vercel.` });
+        return res.status(503).json({ error: `Servidor no responde: ${authResult.error}` });
       }
       if (authResult.notFound || !authResult.data) {
         return res.status(404).json({ error: 'El usuario especificado no existe.' });
@@ -157,7 +157,7 @@ export default async function handler(req, res) {
       
       const authResult = await getStoredAuth();
       if (authResult.serverUnreachable) {
-        return res.status(503).json({ error: `No se pudo conectar con tu servidor en la nube (${baseUrl}).` });
+        return res.status(503).json({ error: `No se pudo conectar con el servidor en la nube (${authResult.error})` });
       }
       if (authResult.data) {
         return res.status(400).json({ error: 'Este usuario ya está registrado. Por favor inicia sesión.' });
@@ -184,7 +184,7 @@ export default async function handler(req, res) {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: authData
-      });
+      }, 15000);
 
       return res.status(200).json({ success: true, userId, message: 'Usuario creado exitosamente.' });
     }
@@ -200,7 +200,7 @@ export default async function handler(req, res) {
 
       const authResult = await getStoredAuth();
       if (authResult.serverUnreachable) {
-        return res.status(503).json({ error: `Servidor inaccesible. Verifica conexión.` });
+        return res.status(503).json({ error: `Servidor no responde: ${authResult.error}` });
       }
       if (authResult.notFound || !authResult.data) {
         return res.status(404).json({ error: 'El usuario especificado no existe.' });
@@ -219,7 +219,7 @@ export default async function handler(req, res) {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(storedAuth, null, 2)
-      });
+      }, 15000);
 
       return res.status(200).json({ success: true, message: 'Contraseña restablecida con éxito. Ya puedes ingresar.' });
     }
@@ -229,7 +229,7 @@ export default async function handler(req, res) {
       if (!userId) return res.status(400).json({ error: 'Ingresa un usuario' });
       const authResult = await getStoredAuth();
       if (authResult.serverUnreachable) {
-        return res.status(503).json({ error: `No se pudo conectar con el servidor Nextcloud (${baseUrl}). Revisa que el túnel esté encendido.` });
+        return res.status(503).json({ error: `No se pudo conectar con el servidor Nextcloud (${authResult.error}). Revisa tu conexión.` });
       }
       if (authResult.notFound || !authResult.data) {
         return res.status(404).json({ error: `El usuario "${userId}" no existe. Por favor crea tu cuenta primero en la pestaña "Crear Cuenta".` });
@@ -261,7 +261,7 @@ export default async function handler(req, res) {
     // 7. OBTENER WORKSPACE
     if (action === 'getWorkspace') {
       const fileUrl = `${userRoot}/workspace_data.json`;
-      const resp = await davFetch(fileUrl, { method: 'GET' });
+      const resp = await davFetch(fileUrl, { method: 'GET' }, 15000);
       if (resp.status === 404) {
         return res.status(200).json({ exists: false, data: null, userId });
       }
@@ -283,7 +283,7 @@ export default async function handler(req, res) {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: jsonContent,
-      });
+      }, 15000);
 
       if (!resp.ok && resp.status !== 201 && resp.status !== 204) {
         return res.status(resp.status).json({ error: `Error guardando: ${resp.statusText}` });
@@ -301,7 +301,7 @@ export default async function handler(req, res) {
         ? `${userRoot}/${encodeURIComponent(subject)}/${encodeURIComponent(filename)}`
         : `${userRoot}/${encodeURIComponent(filename)}`;
 
-      const resp = await davFetch(fileUrl, { method: 'DELETE' });
+      const resp = await davFetch(fileUrl, { method: 'DELETE' }, 15000);
       if (resp.status === 404 || resp.ok || resp.status === 204) {
         return res.status(200).json({ success: true });
       }
