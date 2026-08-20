@@ -42,7 +42,7 @@ export default async function handler(req, res) {
 
   const baseUrl = (process.env.NEXTCLOUD_URL || 'http://127.0.0.1:8080').trim().replace(/^["']|["']$/g, '').replace(/\/+$/, '');
   const ncUser = (process.env.NEXTCLOUD_USER || 'nacho').trim().replace(/^["']|["']$/g, '');
-  const token = (process.env.NEXTCLOUD_TOKEN || 'j0qQfIZe4rar6PBLlj7YjQbZfuUFV3giK35Jg6lg0dVytl627iLKlMtrX7k6cLjLNJmfAdSt').trim().replace(/^["']|["']$/g, '');
+  const token = (process.env.NEXTCLOUD_TOKEN || 'j0qQfIZe4rar6PBLlj7YjQbZfuUFV3giK35Jg6lg0dVytl627iLKlMtrX7k6cLjLNJmfAdSt').replace(/[^a-zA-Z0-9]/g, '');
   const baseDir = (process.env.NEXTCLOUD_DIR || 'APP-Estudio').trim().replace(/^["']|["']$/g, '');
 
   const rawUserId = req.headers['x-user-id'] || req.query.userId || body.userId || '';
