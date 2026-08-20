@@ -435,9 +435,20 @@
                             <input type="password" id="register-pin-confirm-input" placeholder="Repite tu contraseña" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
                         </div>
                         <div>
-                            <label class="text-xs font-semibold text-slate-600 mb-1 block">Palabra clave de recuperación:</label>
-                            <input type="text" id="register-recovery-input" placeholder="ej. mascota o email (para recuperar)" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
-                            <span class="text-[10px] text-slate-400">Te permitirá cambiar la clave si la olvidas.</span>
+                            <label class="text-xs font-semibold text-slate-600 mb-1 block">Pregunta de Seguridad:</label>
+                            <select id="register-question-select" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-indigo-500 bg-white text-slate-700">
+                                <option value="mascota">¿Cómo se llama tu primera mascota?</option>
+                                <option value="ciudad">¿En qué ciudad naciste?</option>
+                                <option value="comida">¿Cuál es tu comida favorita?</option>
+                                <option value="escuela">¿Nombre de tu escuela primaria?</option>
+                                <option value="equipo">¿Cuál es tu equipo o deporte favorito?</option>
+                                <option value="amigo">¿Nombre de tu mejor amigo/a de la infancia?</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-slate-600 mb-1 block">Tu Respuesta:</label>
+                            <input type="text" id="register-answer-input" placeholder="Tu respuesta secreta" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                            <span class="text-[10px] text-slate-400">Te servirá para recuperar la cuenta si olvidas la clave.</span>
                         </div>
                         <button type="button" onclick="window.ServerSync.registerFromModal()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm mt-2">
                             <i class="fas fa-user-plus"></i> Registrar Cuenta
@@ -448,11 +459,11 @@
                     <div id="auth-view-recover" class="hidden space-y-2.5 text-left mb-4">
                         <div>
                             <label class="text-xs font-semibold text-slate-600 mb-1 block">Tu Usuario:</label>
-                            <input type="text" id="recover-username-input" placeholder="Tu usuario registrado" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                            <input type="text" id="recover-username-input" onblur="window.ServerSync.fetchUserQuestionForRecovery()" oninput="window.ServerSync.fetchUserQuestionForRecovery()" placeholder="Tu usuario registrado" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
                         </div>
                         <div>
-                            <label class="text-xs font-semibold text-slate-600 mb-1 block">Palabra Clave de Recuperación:</label>
-                            <input type="text" id="recover-recovery-input" placeholder="La palabra que pusiste al registrarte" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                            <label id="recover-question-label" class="text-xs font-semibold text-slate-600 mb-1 block">Respuesta a tu Pregunta de Seguridad:</label>
+                            <input type="text" id="recover-answer-input" placeholder="Escribe tu respuesta" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
                         </div>
                         <div>
                             <label class="text-xs font-semibold text-slate-600 mb-1 block">Nueva Contraseña:</label>

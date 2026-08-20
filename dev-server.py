@@ -6,6 +6,7 @@ import urllib.parse
 import json
 import base64
 import hashlib
+import unicodedata
 import os
 import sys
 
@@ -19,8 +20,12 @@ auth_bytes = f"{NEXTCLOUD_USER}:{NEXTCLOUD_TOKEN}".encode("utf-8")
 AUTH_HEADER = f"Basic {base64.b64encode(auth_bytes).decode('utf-8')}"
 WEBDAV_ROOT = f"{NEXTCLOUD_URL}/remote.php/dav/files/{urllib.parse.quote(NEXTCLOUD_USER)}/{urllib.parse.quote(NEXTCLOUD_DIR)}"
 
+def normalize_string(s):
+    nfkd = unicodedata.normalize('NFD', str(s or "").strip().lower())
+    return "".join([c for c in nfkd if not unicodedata.combining(c)])
+
 def hash_string(s):
-    return hashlib.sha256(str(s or "").strip().lower().encode('utf-8')).hexdigest()
+    return hashlib.sha256(normalize_string(s).encode('utf-8')).hexdigest()
 
 class DevHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
@@ -95,6 +100,18 @@ class DevHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_json(200, {"online": False, "message": "Respuesta no exitosa"})
             except Exception as e:
                 self.send_json(200, {"online": False, "message": str(e)})
+            return
+
+        if action == "getSecurityQuestion":
+            stored = self.get_stored_auth(user_id)
+            if not stored:
+                self.send_json(404, {"error": "El usuario especificado no existe."})
+                return
+            self.send_json(200, {
+                "success": True,
+                "userId": user_id,
+                "securityQuestion": stored.get("securityQuestion", "mascota")
+            })
             return
 
         if action == "login" or action == "auth":
@@ -179,11 +196,18 @@ class DevHandler(http.server.SimpleHTTPRequestHandler):
             if stored:
                 self.send_json(400, {"error": "Este usuario ya existe. Por favor inicia sesión."})
                 return
-            recovery_key = body.get("recoveryKey", "")
+            
+            security_question = body.get("securityQuestion", "mascota")
+            security_answer = body.get("securityAnswer", "")
+            if not security_answer:
+                self.send_json(400, {"error": "Debes responder a la pregunta de seguridad."})
+                return
+
             auth_data = json.dumps({
                 "userId": user_id,
                 "pinHash": hash_string(pin),
-                "recoveryHash": hash_string(recovery_key) if recovery_key else "",
+                "securityQuestion": security_question,
+                "securityAnswerHash": hash_string(security_answer),
                 "createdAt": 1787240000
             }, indent=2).encode('utf-8')
             auth_url = f"{user_root}/auth.json"
@@ -196,18 +220,21 @@ class DevHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         if action == "recover":
-            recovery_key = body.get("recoveryKey", "")
+            security_answer = body.get("securityAnswer", "")
             new_pin = body.get("newPin", "")
-            if not user_id or not recovery_key or not new_pin:
+            if not user_id or not security_answer or not new_pin:
                 self.send_json(400, {"error": "Faltan datos para restablecer la contraseña."})
                 return
             stored = self.get_stored_auth(user_id)
             if not stored:
                 self.send_json(404, {"error": "El usuario no existe."})
                 return
-            if not stored.get("recoveryHash") or stored.get("recoveryHash") != hash_string(recovery_key):
-                self.send_json(401, {"error": "La palabra clave o respuesta de recuperación es incorrecta."})
+            
+            expected_hash = stored.get("securityAnswerHash") or stored.get("recoveryHash")
+            if not expected_hash or expected_hash != hash_string(security_answer):
+                self.send_json(401, {"error": "La respuesta a la pregunta de seguridad es incorrecta."})
                 return
+            
             stored["pinHash"] = hash_string(new_pin)
             auth_data = json.dumps(stored, indent=2).encode('utf-8')
             auth_url = f"{user_root}/auth.json"

@@ -9,8 +9,16 @@ export const config = {
   maxDuration: 60,
 };
 
+function normalizeString(str) {
+  return String(str || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
 function hashString(str) {
-  return crypto.createHash('sha256').update(String(str || '').trim().toLowerCase()).digest('hex');
+  return crypto.createHash('sha256').update(normalizeString(str)).digest('hex');
 }
 
 export default async function handler(req, res) {
@@ -106,7 +114,21 @@ export default async function handler(req, res) {
       }
     }
 
-    // 2. CREAR CUENTA (REGISTRO EXPLÍCITO)
+    // 2. OBTENER PREGUNTA DE SEGURIDAD DEL USUARIO (para la vista de recuperación)
+    if (action === 'getSecurityQuestion') {
+      if (!userId) return res.status(400).json({ error: 'Ingresa un usuario' });
+      const storedAuth = await getStoredAuth();
+      if (!storedAuth) {
+        return res.status(404).json({ error: 'El usuario especificado no existe.' });
+      }
+      return res.status(200).json({
+        success: true,
+        userId,
+        securityQuestion: storedAuth.securityQuestion || 'mascota'
+      });
+    }
+
+    // 3. CREAR CUENTA (REGISTRO EXPLÍCITO CON PREGUNTA DE SEGURIDAD)
     if (action === 'register' && req.method === 'POST') {
       if (!userId || !rawPin) {
         return res.status(400).json({ error: 'Debes ingresar un nombre de usuario y una contraseña.' });
@@ -117,14 +139,21 @@ export default async function handler(req, res) {
 
       const existingAuth = await getStoredAuth();
       if (existingAuth) {
-        return res.status(400).json({ error: 'Este nombre de usuario ya está registrado. Por favor inicia sesión.' });
+        return res.status(400).json({ error: 'Este usuario ya está registrado. Por favor inicia sesión.' });
       }
 
-      const recoveryKey = req.body.recoveryKey || req.query.recoveryKey || '';
+      const securityQuestion = req.body.securityQuestion || req.query.securityQuestion || 'mascota';
+      const securityAnswer = req.body.securityAnswer || req.query.securityAnswer || '';
+
+      if (!securityAnswer) {
+        return res.status(400).json({ error: 'Debes responder a la pregunta de seguridad.' });
+      }
+
       const authData = JSON.stringify({
         userId,
         pinHash: userPinHash,
-        recoveryHash: recoveryKey ? hashString(recoveryKey) : '',
+        securityQuestion,
+        securityAnswerHash: hashString(securityAnswer),
         createdAt: Date.now()
       }, null, 2);
 
@@ -137,12 +166,12 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, userId, message: 'Usuario creado exitosamente.' });
     }
 
-    // 3. RECUPERAR CONTRASEÑA
+    // 4. RECUPERAR CONTRASEÑA
     if (action === 'recover' && req.method === 'POST') {
-      const recoveryKey = req.body.recoveryKey || req.query.recoveryKey || '';
+      const securityAnswer = req.body.securityAnswer || req.query.securityAnswer || '';
       const newPin = req.body.newPin || req.query.newPin || '';
 
-      if (!userId || !recoveryKey || !newPin) {
+      if (!userId || !securityAnswer || !newPin) {
         return res.status(400).json({ error: 'Faltan datos para la recuperación.' });
       }
 
@@ -151,8 +180,9 @@ export default async function handler(req, res) {
         return res.status(404).json({ error: 'El usuario especificado no existe.' });
       }
 
-      if (!storedAuth.recoveryHash || storedAuth.recoveryHash !== hashString(recoveryKey)) {
-        return res.status(401).json({ error: 'La palabra clave o respuesta de recuperación es incorrecta.' });
+      const expectedAnswerHash = storedAuth.securityAnswerHash || storedAuth.recoveryHash;
+      if (!expectedAnswerHash || expectedAnswerHash !== hashString(securityAnswer)) {
+        return res.status(401).json({ error: 'La respuesta a la pregunta de seguridad es incorrecta.' });
       }
 
       storedAuth.pinHash = hashString(newPin);
@@ -164,10 +194,10 @@ export default async function handler(req, res) {
         body: JSON.stringify(storedAuth, null, 2)
       });
 
-      return res.status(200).json({ success: true, message: 'Contraseña restablecida correctamente. Ya puedes iniciar sesión.' });
+      return res.status(200).json({ success: true, message: 'Contraseña restablecida con éxito. Ya puedes ingresar.' });
     }
 
-    // 4. INICIAR SESIÓN / VALIDACIÓN
+    // 5. INICIAR SESIÓN / VALIDACIÓN
     if (action === 'login' || action === 'auth') {
       if (!userId) return res.status(400).json({ error: 'Ingresa un usuario' });
       const storedAuth = await getStoredAuth();
@@ -186,7 +216,7 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'No autorizado. Inicia sesión con tus credenciales.' });
     }
 
-    // 5. OBTENER WORKSPACE
+    // 6. OBTENER WORKSPACE
     if (action === 'getWorkspace') {
       const fileUrl = `${userRoot}/workspace_data.json`;
       const resp = await davFetch(fileUrl, { method: 'GET' });
@@ -200,7 +230,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ exists: true, data, userId });
     }
 
-    // 6. GUARDAR WORKSPACE
+    // 7. GUARDAR WORKSPACE
     if (action === 'putWorkspace' && req.method === 'POST') {
       await ensureUserHierarchy();
       const payload = req.body.data || req.body;
@@ -219,7 +249,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, userId, timestamp: Date.now() });
     }
 
-    // 7. SUBIR PDF
+    // 8. SUBIR PDF
     if (action === 'uploadPdf' && req.method === 'POST') {
       const { filename, subject, dataBase64 } = req.body;
       if (!filename || !dataBase64) {
@@ -245,7 +275,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, filename, subject, userId });
     }
 
-    // 8. DESCARGAR PDF
+    // 9. DESCARGAR PDF
     if (action === 'getPdf' && req.method === 'GET') {
       const filename = req.query.filename;
       const subject = req.query.subject;
@@ -265,7 +295,7 @@ export default async function handler(req, res) {
       return res.status(200).send(Buffer.from(arrayBuf));
     }
 
-    // 9. ELIMINAR PDF
+    // 10. ELIMINAR PDF
     if (action === 'deletePdf' && (req.method === 'POST' || req.method === 'DELETE')) {
       const filename = req.query.filename || (req.body && req.body.filename);
       const subject = req.query.subject || (req.body && req.body.subject);

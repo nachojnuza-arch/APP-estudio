@@ -10,6 +10,15 @@ window.ServerSync = {
     _checkInterval: null,
     activeTab: 'login',
 
+    QUESTION_LABELS: {
+        'mascota': '¿Cómo se llama tu primera mascota?',
+        'ciudad': '¿En qué ciudad naciste?',
+        'comida': '¿Cuál es tu comida favorita?',
+        'escuela': '¿Nombre de tu escuela primaria?',
+        'equipo': '¿Cuál es tu equipo o deporte favorito?',
+        'amigo': '¿Nombre de tu mejor amigo/a de la infancia?'
+    },
+
     getUserId() {
         return localStorage.getItem('app_sync_user') || '';
     },
@@ -130,12 +139,14 @@ window.ServerSync = {
         const userInput = document.getElementById('register-username-input');
         const pinInput = document.getElementById('register-pin-input');
         const pinConfirmInput = document.getElementById('register-pin-confirm-input');
-        const recoveryInput = document.getElementById('register-recovery-input');
+        const questionSelect = document.getElementById('register-question-select');
+        const answerInput = document.getElementById('register-answer-input');
 
         const user = (userInput?.value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
         const pin = (pinInput?.value || '').trim();
         const pinConfirm = (pinConfirmInput?.value || '').trim();
-        const recoveryKey = (recoveryInput?.value || '').trim();
+        const question = questionSelect?.value || 'mascota';
+        const answer = (answerInput?.value || '').trim();
 
         if (!user) {
             if (typeof showToast === 'function') showToast('Elige un nombre de usuario', 'error');
@@ -149,8 +160,8 @@ window.ServerSync = {
             if (typeof showToast === 'function') showToast('Las contraseñas no coinciden', 'error');
             return;
         }
-        if (!recoveryKey) {
-            if (typeof showToast === 'function') showToast('Ingresa una palabra secreta de recuperación', 'error');
+        if (!answer) {
+            if (typeof showToast === 'function') showToast('Responde a tu pregunta de seguridad', 'error');
             return;
         }
 
@@ -163,7 +174,8 @@ window.ServerSync = {
                 body: JSON.stringify({
                     userId: user,
                     pin: pin,
-                    recoveryKey: recoveryKey
+                    securityQuestion: question,
+                    securityAnswer: answer
                 })
             });
 
@@ -184,18 +196,47 @@ window.ServerSync = {
         }
     },
 
+    // Cargar la pregunta de seguridad guardada del usuario en recuperación
+    async fetchUserQuestionForRecovery() {
+        const userInput = document.getElementById('recover-username-input');
+        const questionLabel = document.getElementById('recover-question-label');
+        const user = (userInput?.value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+
+        if (!user) return;
+
+        try {
+            const res = await fetch(`/api/sync?action=getSecurityQuestion&userId=${encodeURIComponent(user)}`);
+            if (res.ok) {
+                const data = await res.json();
+                const qKey = data.securityQuestion || 'mascota';
+                const labelText = this.QUESTION_LABELS[qKey] || 'Pregunta de seguridad:';
+                if (questionLabel) {
+                    questionLabel.textContent = labelText;
+                    questionLabel.className = 'text-xs font-semibold text-indigo-700 mb-1 block';
+                }
+            } else {
+                if (questionLabel) {
+                    questionLabel.textContent = 'Tu respuesta de seguridad:';
+                    questionLabel.className = 'text-xs font-semibold text-slate-600 mb-1 block';
+                }
+            }
+        } catch (e) {
+            // Ignore
+        }
+    },
+
     // 3. RECUPERAR CONTRASEÑA
     async recoverFromModal() {
         const userInput = document.getElementById('recover-username-input');
-        const recoveryInput = document.getElementById('recover-recovery-input');
+        const answerInput = document.getElementById('recover-answer-input');
         const newPinInput = document.getElementById('recover-new-pin-input');
 
         const user = (userInput?.value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
-        const recoveryKey = (recoveryInput?.value || '').trim();
+        const answer = (answerInput?.value || '').trim();
         const newPin = (newPinInput?.value || '').trim();
 
-        if (!user || !recoveryKey || !newPin) {
-            if (typeof showToast === 'function') showToast('Completa todos los campos para recuperar', 'error');
+        if (!user || !answer || !newPin) {
+            if (typeof showToast === 'function') showToast('Completa todos los campos para restablecer', 'error');
             return;
         }
 
@@ -207,7 +248,7 @@ window.ServerSync = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     userId: user,
-                    recoveryKey: recoveryKey,
+                    securityAnswer: answer,
                     newPin: newPin
                 })
             });
@@ -221,7 +262,7 @@ window.ServerSync = {
                 if (logUser) logUser.value = user;
                 if (logPin) logPin.value = newPin;
             } else {
-                if (typeof showToast === 'function') showToast(data.error || 'Datos de recuperación incorrectos', 'error');
+                if (typeof showToast === 'function') showToast(data.error || 'Respuesta de seguridad incorrecta', 'error');
             }
         } catch (e) {
             if (typeof showToast === 'function') showToast('Error al conectar con el servidor', 'error');
