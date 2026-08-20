@@ -122,12 +122,16 @@ window.ServerSync = {
                 localStorage.setItem('app_sync_user', user);
                 localStorage.setItem('app_sync_pin', pin);
                 this._uploadConfig = null;
+
+                // Limpiar espacio anterior para cargar los apuntes del usuario que ingresa
+                window.appData = { subjects: [], notes: {} };
+                if (typeof renderSubjects === 'function') renderSubjects();
+
                 if (typeof closeModal === 'function') closeModal('login-modal');
-                if (typeof showToast === 'function') showToast(`¡Bienvenido ${user}! Sincronizando...`, 'success');
+                if (typeof showToast === 'function') showToast(`¡Bienvenido ${user}! Cargando tu espacio...`, 'success');
                 this.isServerOnline = true;
                 this.updateUI();
                 await this.pullWorkspaceIfNewer();
-                await this.syncAppData(window.appData);
             } else {
                 if (typeof showToast === 'function') showToast(data.error || 'Usuario o contraseña incorrectos', 'error');
             }
@@ -267,17 +271,40 @@ window.ServerSync = {
             } else {
                 if (typeof showToast === 'function') showToast(data.error || 'Respuesta de seguridad incorrecta', 'error');
             }
-        } catch (e) {
-            if (typeof showToast === 'function') showToast('Error al conectar con el servidor', 'error');
-        }
-    },
-
     logout() {
         localStorage.removeItem('app_sync_user');
         localStorage.removeItem('app_sync_pin');
         this._uploadConfig = null;
+
+        // 1. Limpiar completamente los datos del usuario anterior de la memoria y del almacenamiento local por privacidad
+        window.appData = { subjects: [], notes: {} };
+        localStorage.removeItem('studio_data_v2');
+        localStorage.removeItem('studio_data_v2_idb');
+        if (window.idb && typeof window.idb.clearAllStores === 'function') {
+            window.idb.clearAllStores().catch(() => {});
+        }
+
+        // 2. Limpiar editor de apuntes y visor de PDF
+        const editor = document.getElementById('notes-editor');
+        if (editor) editor.innerHTML = '';
+        document.getElementById('pdf-container')?.classList.add('hidden');
+        document.getElementById('pdf-controls')?.classList.add('hidden');
+        document.getElementById('video-container')?.classList.add('hidden');
+        document.getElementById('subject-dashboard')?.classList.add('hidden');
+        document.getElementById('empty-state')?.classList.remove('hidden');
+
+        if (window.currentState) {
+            window.currentState.currentSubject = null;
+            window.currentState.currentFile = null;
+            window.currentState.currentSheetId = 'main';
+            window.currentState.isDirty = false;
+        }
+
+        // 3. Re-renderizar lista de materias (ahora limpia y vacía)
+        if (typeof renderSubjects === 'function') renderSubjects();
+
         if (typeof closeModal === 'function') closeModal('login-modal');
-        if (typeof showToast === 'function') showToast('Sesión cerrada. Modo local activo.', 'info');
+        if (typeof showToast === 'function') showToast('Sesión cerrada. Espacio de trabajo limpio.', 'info');
         this.updateUI();
     },
 
